@@ -1,0 +1,24 @@
+# FastAPI 및 웹 서버
+fastapi>=0.100.0
+uvicorn>=0.22.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+python-multipart>=0.0.6
+
+# HTTP 클라이언트
+aiohttp>=3.8.5
+requests>=2.31.0
+
+# AI 및 머신 러닝
+torch>=2.0.0
+torchvision>=0.15.0
+transformers>=4.30.0
+accelerate>=0.20.0
+pillow>=10.0.0
+sentencepiece>=0.1.99
+
+# 유틸리티
+numpy>=1.24.0
+pytest>=7.3.1
+pytest-asyncio>=0.21.0
