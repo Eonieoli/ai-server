@@ -31,8 +31,8 @@ class Settings(BaseSettings):
     def MODEL_CACHE_DIR(self) -> Path:
         return self.ROOT_DIR / "models" / "downloads"
     
-    USE_GPU: bool = Field(default=False)  # 기본값은 CPU 사용
-    GPU_DEVICE: int = Field(default=0)    # GPU 장치 번호 (0부터 시작)
+    USE_GPU: bool = Field(default=True)  # 기본값은 CPU 사용
+    GPU_DEVICE: int = Field(default=3)    # GPU 장치 번호 (0부터 시작)
     
     # 임시 파일 디렉토리
     @property
