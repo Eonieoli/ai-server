@@ -1,24 +1,25 @@
 """
 응답에 대한 Pydantic 스키마 정의
 """
+from typing import Dict, Any
 from pydantic import BaseModel, Field
 
 
-class EvaluationDetail(BaseModel):
-    """평가 세부 정보 스키마"""
-    score: int = Field(..., ge=1, le=10, description="1부터 10까지의 점수")
-    comment: str = Field(..., description="평가에 대한 간략한 설명")
+class ScoreComment(BaseModel):
+    """점수와 코멘트 스키마"""
+    score: int
+    comment: str
 
 
 class ImageAnalysisResponse(BaseModel):
     """이미지 분석 응답 스키마"""
-    composition: EvaluationDetail
-    sharpness: EvaluationDetail
-    noise: EvaluationDetail
-    exposure: EvaluationDetail
-    color_harmony: EvaluationDetail
-    aesthetics: EvaluationDetail
-    overall_comment: str = Field(..., description="전체적인 평가 코멘트")
+    composition: ScoreComment
+    sharpness: ScoreComment
+    noise: ScoreComment
+    exposure: ScoreComment
+    color_harmony: ScoreComment
+    aesthetics: ScoreComment
+    overall: ScoreComment
 
 
 class HealthResponse(BaseModel):

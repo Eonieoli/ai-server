@@ -101,7 +101,10 @@ docker-compose up ai-server-gpu
     "score": 7,
     "comment": "심미성에 대한 평가 코멘트"
   },
-  "overall_comment": "이미지에 대한 종합적인 평가 코멘트"
+  "overall": {
+    "score": 8,
+    "comment": "이미지에 대한 종합적인 평가 코멘트"
+  }
 }
 ```
 

@@ -56,7 +56,7 @@ async def analyze_image(request: ImageAnalysisRequest):
             exposure=result["exposure"],
             color_harmony=result["color_harmony"],
             aesthetics=result["aesthetics"],
-            overall_comment=result["overall_comment"]
+            overall=result["overall"]
         )
         
     except ValueError as e:

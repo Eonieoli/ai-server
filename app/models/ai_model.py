@@ -4,16 +4,12 @@ AI 모델 정의 및 로딩 관련 코드
 import json
 import torch
 import logging
+import numpy as np
 from pathlib import Path
 from typing import Dict, Any, Union, Optional
+from PIL import Image
 
-from transformers import (
-    AutoProcessor, 
-    AutoModelForVision2Seq, 
-    AutoConfig,
-    pipeline, 
-    LlavaNextVideoProcessor
-)
+from transformers import LlavaNextVideoProcessor, LlavaNextVideoForConditionalGeneration
 
 from app.core.config import settings
 
@@ -26,7 +22,6 @@ class ImageAnalysisModel:
     def __init__(self):
         self.model = None
         self.processor = None
-        self.pipe = None
         self.device = self._get_device()
         self.model_loaded = False
     
@@ -58,56 +53,21 @@ class ImageAnalysisModel:
             # 모델 캐시 디렉토리 생성
             Path(settings.MODEL_CACHE_DIR).mkdir(parents=True, exist_ok=True)
             
-            # CPU에서 로드할 때는 더 적은 리소스 사용하도록 설정
-            torch_dtype = torch.float16 if self.device.type == "cuda" else torch.float32
+            # 모델 로드 (예제 코드 기반)
+            self.model = LlavaNextVideoForConditionalGeneration.from_pretrained(
+                settings.MODEL_NAME,
+                torch_dtype=torch.float16 if self.device.type == "cuda" else torch.float32,
+                low_cpu_mem_usage=True,
+            ).to(self.device)
             
-            # LLaVA-NeXT-Video 모델 설정 확인
-            config = AutoConfig.from_pretrained(
+            logger.info("Model loaded using LlavaNextVideoForConditionalGeneration")
+            
+            # 프로세서 로드
+            self.processor = LlavaNextVideoProcessor.from_pretrained(
                 settings.MODEL_NAME,
                 cache_dir=settings.MODEL_CACHE_DIR
             )
-            
-            # 모델 유형에 따라 적절한 클래스 선택
-            try:
-                # 멀티모달 비전-언어 모델 로드 시도
-                self.model = AutoModelForVision2Seq.from_pretrained(
-                    settings.MODEL_NAME,
-                    torch_dtype=torch_dtype,
-                    device_map=self.device if self.device.type == "cuda" else None,
-                    cache_dir=settings.MODEL_CACHE_DIR,
-                    low_cpu_mem_usage=True if self.device.type == "cpu" else False
-                )
-                logger.info("Model loaded using AutoModelForVision2Seq")
-            except Exception as e:
-                logger.warning(f"Failed to load with AutoModelForVision2Seq: {e}")
-                # 일반 비전-언어 모델 로드 시도
-                from transformers import LlavaNextVideoForConditionalGeneration
-                self.model = LlavaNextVideoForConditionalGeneration.from_pretrained(
-                    settings.MODEL_NAME,
-                    torch_dtype=torch_dtype,
-                    device_map=self.device if self.device.type == "cuda" else None,
-                    cache_dir=settings.MODEL_CACHE_DIR,
-                    low_cpu_mem_usage=True if self.device.type == "cpu" else False
-                )
-                logger.info("Model loaded using LlavaNextVideoForConditionalGeneration")
-            
-            # 프로세서 로드
-            try:
-                self.processor = LlavaNextVideoProcessor.from_pretrained(
-                    settings.MODEL_NAME,
-                    cache_dir=settings.MODEL_CACHE_DIR
-                )
-                logger.info("Processor loaded using LlavaNextVideoProcessor")
-            except Exception as e:
-                logger.warning(f"Failed to load with LlavaNextVideoProcessor: {e}")
-                self.processor = AutoProcessor.from_pretrained(
-                    settings.MODEL_NAME,
-                    cache_dir=settings.MODEL_CACHE_DIR
-                )
-                logger.info("Processor loaded using AutoProcessor")
-            
-            # 직접 추론 함수 정의
-            self.pipe = self._create_custom_pipeline()
+            logger.info("Processor loaded using LlavaNextVideoProcessor")
             
             self.model_loaded = True
             logger.info(f"Model loaded successfully on {self.device}")
@@ -119,54 +79,17 @@ class ImageAnalysisModel:
             self.model_loaded = False
             return False
     
-    def _create_custom_pipeline(self):
-        """
-        모델에 맞춘 커스텀 파이프라인 함수 생성
-        
-        Returns:
-            callable: 이미지와 프롬프트를 처리하는 함수
-        """
-        def inference_fn(images, prompt, generate_kwargs=None):
-            if generate_kwargs is None:
-                generate_kwargs = {"max_new_tokens": 512, "temperature": 0.1}
-            
-            try:
-                # 입력 준비
-                inputs = self.processor(text=prompt, images=images, return_tensors="pt")
-                
-                # 디바이스로 이동
-                inputs = {name: tensor.to(self.device) for name, tensor in inputs.items()}
-                
-                # 생성
-                with torch.no_grad():
-                    outputs = self.model.generate(
-                        **inputs,
-                        **generate_kwargs
-                    )
-                
-                # 디코딩
-                generated_text = self.processor.batch_decode(outputs, skip_special_tokens=True)[0]
-                
-                return [{"generated_text": generated_text}]
-            except Exception as e:
-                logger.error(f"Error in custom pipeline: {e}")
-                return [{"generated_text": f"오류가 발생했습니다: {str(e)}"}]
-        
-        return inference_fn
-    
     def unload_model(self):
         """모델 메모리에서 해제"""
         if self.model:
             del self.model
             del self.processor
-            del self.pipe
             
             if self.device.type == "cuda":
                 torch.cuda.empty_cache()
             
             self.model = None
             self.processor = None
-            self.pipe = None
             self.model_loaded = False
             
             logger.info("Model unloaded from memory")
@@ -193,46 +116,97 @@ class ImageAnalysisModel:
             if not image_path.exists():
                 raise FileNotFoundError(f"Image file not found: {image_path}")
             
-            # 모델에 프롬프트와 이미지 전달
-            result = self.pipe(
-                images=str(image_path),
-                prompt=settings.PROMPT_TEMPLATE,
-                generate_kwargs={"temperature": 0.1, "max_new_tokens": 512}
-            )
+            # 이미지 로드
+            image = Image.open(image_path).convert("RGB")
             
-            # 응답 텍스트 추출
-            response_text = result[0]["generated_text"] if isinstance(result, list) and result else ""
-            
-            # JSON 부분 추출
             try:
-                # JSON 부분만 추출 (중괄호 시작부터 끝까지)
-                json_start = response_text.find("{")
-                json_end = response_text.rfind("}") + 1
+                # 예제 코드에 따라 chat template을 사용하여 프롬프트 생성
+                conversation = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": settings.PROMPT_TEMPLATE},
+                            {"type": "image"},  # 이미지를 여기에 넣을 것임
+                        ],
+                    },
+                ]
                 
-                if json_start >= 0 and json_end > json_start:
-                    json_str = response_text[json_start:json_end]
-                    analysis_result = json.loads(json_str)
-                else:
-                    # JSON을 찾을 수 없는 경우 기본 응답 생성
-                    logger.warning("JSON not found in model response. Using default response.")
+                prompt = self.processor.apply_chat_template(
+                    conversation, 
+                    add_generation_prompt=True
+                )
+                
+                # 이미지를 numpy 배열로 변환 (processor가 필요로 함)
+                image_np = np.array(image)
+                
+                # 입력 준비
+                inputs = self.processor(
+                    text=prompt, 
+                    images=image_np, 
+                    padding=True, 
+                    return_tensors="pt"
+                ).to(self.device)
+                
+                # 생성
+                with torch.no_grad():
+                    output = self.model.generate(
+                        **inputs,
+                        max_new_tokens=512, 
+                        do_sample=True,
+                        temperature=0.1
+                    )
+                
+                # 응답 디코딩 (예제 코드와 같이 output[0][2:]를 사용)
+                generated_text = self.processor.decode(
+                    output[0][2:], 
+                    skip_special_tokens=True
+                )
+                
+                # 로그에 생성된 텍스트 기록
+                logger.info(f"Generated text: {generated_text}")
+                
+                # JSON 부분 추출
+                try:
+                    # 마크다운 코드 블록에서 JSON 추출
+                    if "```json" in generated_text and "```" in generated_text.split("```json", 1)[1]:
+                        # 마크다운 JSON 코드 블록 파싱
+                        json_content = generated_text.split("```json", 1)[1].split("```", 1)[0].strip()
+                        analysis_result = json.loads(json_content)
+                    else:
+                        # 일반적인 JSON 추출 시도
+                        json_start = generated_text.find("{")
+                        json_end = generated_text.rfind("}") + 1
+                        
+                        if json_start >= 0 and json_end > json_start:
+                            json_str = generated_text[json_start:json_end]
+                            analysis_result = json.loads(json_str)
+                        else:
+                            # JSON을 찾을 수 없는 경우 기본 응답 생성
+                            logger.warning("JSON not found in model response. Using default response.")
+                            analysis_result = self._create_default_response()
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse JSON from model response: {e}")
                     analysis_result = self._create_default_response()
-            except json.JSONDecodeError:
-                logger.error("Failed to parse JSON from model response")
-                analysis_result = self._create_default_response()
+                
+                # 결과 유효성 검사 및 포맷 맞추기
+                return self._validate_and_format_result(analysis_result)
             
-            # 결과 유효성 검사 및 포맷 맞추기
-            return self._validate_and_format_result(analysis_result)
+            except Exception as e:
+                logger.error(f"Error in model inference: {e}")
+                return self._create_default_response()
             
         except Exception as e:
             logger.error(f"Error analyzing image: {e}")
-            raise
+            return self._create_default_response()
     
     def _create_default_response(self) -> Dict[str, Any]:
         """기본 응답 생성"""
-        return {
+        result = {
             category: {"score": 5, "comment": "평가 실패"} 
             for category in settings.EVALUATION_CATEGORIES
         }
+        result["overall"] = "이미지를 분석하는 동안 오류가 발생했습니다."
+        return result
     
     def _validate_and_format_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -272,11 +246,11 @@ class ImageAnalysisModel:
                 }
         
         # 전체 코멘트 확인
-        overall_comment = result.get("overall_comment", "")
-        if not isinstance(overall_comment, str):
-            overall_comment = "이미지에 대한 전체적인 평가 정보를 제공하지 못했습니다."
+        overall= result.get("overall", "")
+        if not isinstance(overall, dict):
+            overall = {"score": 5, "comment": "이미지에 대한 전체적인 평가 정보를 제공하지 못했습니다."}
         
-        formatted_result["overall_comment"] = overall_comment
+        formatted_result["overall"] = overall
         
         return formatted_result
 

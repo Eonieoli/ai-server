@@ -32,15 +32,15 @@ class Settings(BaseSettings):
         return self.ROOT_DIR / "models" / "downloads"
     
     USE_GPU: bool = Field(default=True)  # 기본값은 CPU 사용
-    GPU_DEVICE: int = Field(default=3)    # GPU 장치 번호 (0부터 시작)
+    GPU_DEVICE: int = Field(default=0)    # GPU 장치 번호 (0부터 시작)
     
     # 임시 파일 디렉토리
     @property
     def TEMP_DIR(self) -> Path:
         return self.ROOT_DIR / "temp"
     
-    # 최대 이미지 크기 제한 (바이트 단위, 기본 10MB)
-    MAX_IMAGE_SIZE: int = 10 * 1024 * 1024
+    # 최대 이미지 크기 제한 (바이트 단위, 기본 20MB)
+    MAX_IMAGE_SIZE: int = 20 * 1024 * 1024
     
     # 평가 카테고리
     EVALUATION_CATEGORIES: List[str] = [
@@ -54,11 +54,11 @@ class Settings(BaseSettings):
     
     # 프롬프트 템플릿
     PROMPT_TEMPLATE: str = """
-    이 사진을 다음 기준에 따라 1에서 10까지의 점수로 평가해주세요:
+    이 사진을 다음 기준에 따라 1에서 100까지의 점수로 평가해주세요:
     
     1. 구도(Composition): 사진의 요소들이 얼마나 조화롭게 배치되어 있는지
     2. 선명도(Sharpness): 사진의 주요 주제가 얼마나 선명하게 촬영되었는지
-    3. 노이즈(Noise): 사진에 노이즈가 얼마나 적은지 (10 = 노이즈 없음)
+    3. 노이즈(Noise): 사진의 품질에 영향을 주는 디지털 노이즈의 정도를 평가해주세요. **노이즈가 적을수록 높은 점수를 주세요. 즉, 깨끗하고 잡음이 없는 사진일수록 더 좋은 점수를 받아야 합니다.**
     4. 노출(Exposure): 사진의 밝기가 얼마나 적절한지
     5. 색감(Color Harmony): 색상의 조화가 얼마나 잘 이루어졌는지
     6. 심미성(Aesthetics): 전반적인 미적 품질
@@ -71,7 +71,7 @@ class Settings(BaseSettings):
         "exposure": {"score": 0, "comment": ""},
         "color_harmony": {"score": 0, "comment": ""},
         "aesthetics": {"score": 0, "comment": ""},
-        "overall_comment": ""
+        "overall": {"score": 0, "comment": ""}
     }
     """
     
