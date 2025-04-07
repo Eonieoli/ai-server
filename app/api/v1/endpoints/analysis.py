@@ -48,16 +48,8 @@ async def analyze_image(request: ImageAnalysisRequest):
         # 이미지 URL 처리 및 분석
         result = await ai_service.process_image_url(str(request.image_url))
         
-        # 응답 생성
-        return ImageAnalysisResponse(
-            구도=result["composition"],
-            선명도=result["sharpness"],
-            노이즈=result["noise_free"],
-            노출=result["exposure"],
-            색감=result["color_harmony"],
-            심미성=result["aesthetics"],
-            종합평가=result["overall"]
-        )
+        # 응답 생성 (result는 이미 원하는 형태로 포맷됨)
+        return result
         
     except ValueError as e:
         logger.error(f"Value error: {e}")

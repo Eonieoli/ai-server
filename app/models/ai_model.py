@@ -202,22 +202,43 @@ class ImageAnalysisModel:
     def _create_default_response(self) -> Dict[str, Any]:
         """기본 응답 생성"""
         import random
-        result = {}
         
-        # 평가 카테고리에 대해 기본 응답 생성
-        for category in settings.EVALUATION_CATEGORIES:
-            result[category] = {
-                "score": random.randint(30, 70),  # 덤 실패할 경우는 중간 점수대 랜덤 점수
-                "comment": "평가 실패"
-            }
-        
-        # 전체 평가 추가
-        result["overall"] = {
-            "score": random.randint(30, 70),
-            "comment": "이미지를 분석하는 동안 오류가 발생했습니다."
+        # 카테고리 매핑
+        category_mapping = {
+            "composition": "구도",
+            "sharpness": "선명도",
+            "noise_free": "노이즈",
+            "exposure": "노출",
+            "color_harmony": "색감", 
+            "aesthetics": "심미성"
         }
         
-        return result
+        # 분석 텍스트와 차트 데이터 준비
+        analysis_text = {}
+        analysis_chart = {}
+        
+        # 랜덤 점수로 각 카테고리 채우기
+        for category in settings.EVALUATION_CATEGORIES:
+            kor_category = category_mapping.get(category, category)
+            score = random.randint(30, 70)
+            analysis_text[kor_category] = "평가 실패"
+            analysis_chart[kor_category] = score
+        
+        # 종합 점수와 코멘트
+        overall_score = random.randint(30, 70)
+        overall_comment = "이미지를 분석하는 동안 오류가 발생했습니다."
+        
+        # 기본 해시태그
+        hashtags = ["사진", "이미지", "분석"]
+        
+        # 최종 결과 조합
+        return {
+            "score": overall_score,
+            "comment": overall_comment,
+            "analysisText": analysis_text,
+            "analysisChart": analysis_chart,
+            "hashTag": hashtags
+        }
     
     def _validate_and_format_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -227,25 +248,26 @@ class ImageAnalysisModel:
             result (Dict[str, Any]): 원본 결과
             
         Returns:
-            Dict[str, Any]: 검증 및 포맷팅된 결과
+            Dict[str, Any]: 새 형식으로 포맷팅된 결과
         """
-        # 결과가 모든 카테고리를 포함하는지 확인
-        formatted_result = {}
+        # 분석 텍스트와 차트 데이터를 저장할 객체
+        analysis_text = {}
+        analysis_chart = {}
         
         # 한글 카테고리 매핑
         category_mapping = {
-            "composition": "composition",
-            "sharpness": "sharpness",
-            "noise_free": "noise_free",
-            "exposure": "exposure",
-            "color_harmony": "color_harmony", 
-            "aesthetics": "aesthetics",
-            "overall": "overall"
+            "composition": "구도",
+            "sharpness": "선명도",
+            "noise_free": "노이즈",
+            "exposure": "노출",
+            "color_harmony": "색감", 
+            "aesthetics": "심미성"
         }
         
         # 로그 추가
         import random
         
+        # 각 평가 카테고리 처리
         for category in settings.EVALUATION_CATEGORIES:
             if category in result and isinstance(result[category], dict):
                 cat_result = result[category]
@@ -283,20 +305,23 @@ class ImageAnalysisModel:
                 from app.utils.translator import translate_text
                 translated_comment = translate_text(comment, source_lang="en", target_lang="ko")
                 
-                formatted_result[category_mapping[category]] = {
-                    "score": score,
-                    "comment": translated_comment
-                }
+                # 한글 카테고리로 변환
+                kor_category = category_mapping.get(category, category)
+                
+                # 분석 텍스트와 차트에 저장
+                analysis_text[kor_category] = translated_comment
+                analysis_chart[kor_category] = score
             else:
-                formatted_result[category_mapping[category]] = {
-                    "score": 50,
-                    "comment": "평가 정보가 누락되었습니다."
-                }
+                # 카테고리가 없으면 기본값 설정
+                kor_category = category_mapping.get(category, category)
+                analysis_text[kor_category] = "평가 정보가 누락되었습니다."
+                analysis_chart[kor_category] = 50
         
-        # 전체 코멘트 확인
+        # 전체 평가 처리
         overall = result.get("overall", "")
         if not isinstance(overall, dict):
-            overall = {"score": 50, "comment": "이미지에 대한 전체적인 평가 정보를 제공하지 못했습니다."}
+            overall_score = 50
+            overall_comment = "이미지에 대한 전체적인 평가 정보를 제공하지 못했습니다."
         else:
             # 전체 점수 확인 및 조정
             overall_score = overall.get("score", 50)
@@ -326,11 +351,41 @@ class ImageAnalysisModel:
             overall_comment = overall.get("comment", "")
             if not isinstance(overall_comment, str):
                 overall_comment = str(overall_comment)
-            translated_overall = translate_text(overall_comment, source_lang="en", target_lang="ko")
-            
-            overall = {"score": overall_score, "comment": translated_overall}
+            overall_comment = translate_text(overall_comment, source_lang="en", target_lang="ko")
         
-        formatted_result["overall"] = overall
+        # 해시태그 처리
+        hashtags = result.get("hashtags", [])
+        if not isinstance(hashtags, list) or len(hashtags) == 0:
+            # 모델이 해시태그를 제공하지 않은 경우, 기본 해시태그 생성
+            hashtags = ["사진", "포토", "이미지"]
+        
+        # 해시태그 번역
+        translated_hashtags = []
+        for tag in hashtags[:4]:  # 최대 4개로 제한
+            if tag and isinstance(tag, str):
+                # 영어 태그를 한글로 번역
+                translated_tag = translate_text(tag, source_lang="en", target_lang="ko")
+                translated_hashtags.append(translated_tag)
+        
+        # 해시태그 수가 부족하면 기본 태그 추가
+        while len(translated_hashtags) < 3:
+            if "사진" not in translated_hashtags:
+                translated_hashtags.append("사진")
+            elif "포토" not in translated_hashtags:
+                translated_hashtags.append("포토")
+            elif "이미지" not in translated_hashtags:
+                translated_hashtags.append("이미지")
+            else:
+                break
+        
+        # 결과 형식화
+        formatted_result = {
+            "score": overall_score,
+            "comment": overall_comment,
+            "analysisText": analysis_text,
+            "analysisChart": analysis_chart,
+            "hashTag": translated_hashtags[:4]  # 최대 4개로 제한
+        }
         
         return formatted_result
 

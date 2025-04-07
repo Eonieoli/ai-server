@@ -77,6 +77,8 @@ class Settings(BaseSettings):
     5. Color Harmony: How well the colors work together
     6. Aesthetics: Overall aesthetic quality
     
+    Also, please suggest up to 4 relevant hashtags that describe the content, style, or subject of this image.
+    
     Provide a score and a brief explanation for each item. Return the results in JSON format:
     {
         "composition": {"score": 0, "comment": ""},
@@ -85,7 +87,8 @@ class Settings(BaseSettings):
         "exposure": {"score": 0, "comment": ""},
         "color_harmony": {"score": 0, "comment": ""},
         "aesthetics": {"score": 0, "comment": ""},
-        "overall": {"score": 0, "comment": ""}
+        "overall": {"score": 0, "comment": ""},
+        "hashtags": ["", "", "", ""]
     }
     
     Important: Scores should be between 1 and 100. For noise_free, higher scores mean LESS noise (cleaner image).
