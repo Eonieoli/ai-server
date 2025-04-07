@@ -50,13 +50,13 @@ async def analyze_image(request: ImageAnalysisRequest):
         
         # 응답 생성
         return ImageAnalysisResponse(
-            composition=result["composition"],
-            sharpness=result["sharpness"],
-            noise=result["noise"],
-            exposure=result["exposure"],
-            color_harmony=result["color_harmony"],
-            aesthetics=result["aesthetics"],
-            overall=result["overall"]
+            구도=result["composition"],
+            선명도=result["sharpness"],
+            노이즈=result["noise_free"],
+            노출=result["exposure"],
+            색감=result["color_harmony"],
+            심미성=result["aesthetics"],
+            종합평가=result["overall"]
         )
         
     except ValueError as e:

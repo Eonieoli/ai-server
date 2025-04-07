@@ -1,7 +1,7 @@
 """
 요청에 대한 Pydantic 스키마 정의
 """
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, Field
 
 
 class ImageAnalysisRequest(BaseModel):

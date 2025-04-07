@@ -13,13 +13,13 @@ class ScoreComment(BaseModel):
 
 class ImageAnalysisResponse(BaseModel):
     """이미지 분석 응답 스키마"""
-    composition: ScoreComment
-    sharpness: ScoreComment
-    noise: ScoreComment
-    exposure: ScoreComment
-    color_harmony: ScoreComment
-    aesthetics: ScoreComment
-    overall: ScoreComment
+    구도: ScoreComment
+    선명도: ScoreComment
+    노이즈: ScoreComment
+    노출: ScoreComment
+    색감: ScoreComment
+    심미성: ScoreComment
+    종합평가: ScoreComment
 
 
 class HealthResponse(BaseModel):

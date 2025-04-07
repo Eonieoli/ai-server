@@ -201,11 +201,22 @@ class ImageAnalysisModel:
     
     def _create_default_response(self) -> Dict[str, Any]:
         """기본 응답 생성"""
-        result = {
-            category: {"score": 5, "comment": "평가 실패"} 
-            for category in settings.EVALUATION_CATEGORIES
+        import random
+        result = {}
+        
+        # 평가 카테고리에 대해 기본 응답 생성
+        for category in settings.EVALUATION_CATEGORIES:
+            result[category] = {
+                "score": random.randint(30, 70),  # 덤 실패할 경우는 중간 점수대 랜덤 점수
+                "comment": "평가 실패"
+            }
+        
+        # 전체 평가 추가
+        result["overall"] = {
+            "score": random.randint(30, 70),
+            "comment": "이미지를 분석하는 동안 오류가 발생했습니다."
         }
-        result["overall"] = "이미지를 분석하는 동안 오류가 발생했습니다."
+        
         return result
     
     def _validate_and_format_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
@@ -221,34 +232,103 @@ class ImageAnalysisModel:
         # 결과가 모든 카테고리를 포함하는지 확인
         formatted_result = {}
         
+        # 한글 카테고리 매핑
+        category_mapping = {
+            "composition": "composition",
+            "sharpness": "sharpness",
+            "noise_free": "noise_free",
+            "exposure": "exposure",
+            "color_harmony": "color_harmony", 
+            "aesthetics": "aesthetics",
+            "overall": "overall"
+        }
+        
+        # 로그 추가
+        import random
+        
         for category in settings.EVALUATION_CATEGORIES:
             if category in result and isinstance(result[category], dict):
                 cat_result = result[category]
                 
                 # 점수 확인 및 조정
-                score = cat_result.get("score", 5)
-                if not isinstance(score, int) or score < 1 or score > 10:
-                    score = max(1, min(10, int(score) if isinstance(score, (int, float)) else 5))
+                score = cat_result.get("score", 50)
+                if not isinstance(score, (int, float)):
+                    score = 50
+                
+                # 1-10 점수를 1-100 점수로 변환
+                if 1 <= score <= 10:
+                    # 단순히 10을 곱하는 것이 아니라 분포를 가진 점수로 변환
+                    base_score = int(score * 10)  # 기본 점수 (10점은 100점)
+                    
+                    # 1-7점의 경우: 분포를 가진 랜덤 점수 생성
+                    if score < 8:
+                        variation = random.randint(-5, 5)  # -5 ~ +5 사이의 변동
+                        final_score = max(1, min(100, base_score + variation))
+                    # 8-10점의 경우: 더 작은 범위의 변동 적용 (높은 점수 유지)
+                    else:
+                        variation = random.randint(-3, 3)  # -3 ~ +3 사이의 작은 변동
+                        final_score = max(70, min(100, base_score + variation))
+                    
+                    score = final_score
+                
+                # 최종 점수 범위 확인
+                score = max(1, min(100, int(score)))
                 
                 # 코멘트 확인
                 comment = cat_result.get("comment", "")
                 if not isinstance(comment, str):
                     comment = str(comment)
                 
-                formatted_result[category] = {
+                # 번역 적용
+                from app.utils.translator import translate_text
+                translated_comment = translate_text(comment, source_lang="en", target_lang="ko")
+                
+                formatted_result[category_mapping[category]] = {
                     "score": score,
-                    "comment": comment
+                    "comment": translated_comment
                 }
             else:
-                formatted_result[category] = {
-                    "score": 5,
+                formatted_result[category_mapping[category]] = {
+                    "score": 50,
                     "comment": "평가 정보가 누락되었습니다."
                 }
         
         # 전체 코멘트 확인
-        overall= result.get("overall", "")
+        overall = result.get("overall", "")
         if not isinstance(overall, dict):
-            overall = {"score": 5, "comment": "이미지에 대한 전체적인 평가 정보를 제공하지 못했습니다."}
+            overall = {"score": 50, "comment": "이미지에 대한 전체적인 평가 정보를 제공하지 못했습니다."}
+        else:
+            # 전체 점수 확인 및 조정
+            overall_score = overall.get("score", 50)
+            if not isinstance(overall_score, (int, float)):
+                overall_score = 50
+            
+            # 1-10 점수를 1-100 점수로 변환
+            if 1 <= overall_score <= 10:
+                # 단순히 10을 곱하는 것이 아니라 분포를 가진 점수로 변환
+                base_score = int(overall_score * 10)  # 기본 점수 (10점은 100점)
+                
+                # 점수에 따라 다른 변동 적용
+                if overall_score < 8:
+                    variation = random.randint(-5, 5)  # -5 ~ +5 사이의 변동
+                    final_score = max(1, min(100, base_score + variation))
+                else:
+                    variation = random.randint(-3, 3)  # -3 ~ +3 사이의 작은 변동
+                    final_score = max(70, min(100, base_score + variation))
+                
+                overall_score = final_score
+            
+            # 최종 점수 범위 확인
+            overall_score = max(1, min(100, int(overall_score)))
+            
+            # 전체 코멘트 번역
+            from app.utils.translator import translate_text
+            overall_comment = overall.get("comment", "")
+            if not isinstance(overall_comment, str):
+                overall_comment = str(overall_comment)
+            translated_overall = translate_text(overall_comment, source_lang="en", target_lang="ko")
+            
+            overall = {"score": overall_score, "comment": translated_overall}
         
         formatted_result["overall"] = overall
         

@@ -3,7 +3,7 @@
 """
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
     AWS_S3_BUCKET_NAME: Optional[str] = None
     AWS_REGION: str = "ap-northeast-2"
+    
+    # 번역 API 설정
+    GOOGLE_TRANSLATE_KEY: Optional[str] = None
     
     # AI 모델 관련 설정
     MODEL_NAME: str = "llava-hf/LLaVA-NeXT-Video-7B-hf"
@@ -46,33 +49,46 @@ class Settings(BaseSettings):
     EVALUATION_CATEGORIES: List[str] = [
         "composition",     # 구도
         "sharpness",       # 선명도
-        "noise",           # 노이즈
+        "noise_free",      # 노이즈 없음
         "exposure",        # 노출
         "color_harmony",   # 색감
         "aesthetics"       # 심미성
     ]
     
+    # 평가 카테고리 한글명
+    CATEGORY_KOREAN_NAMES: Dict[str, str] = {
+        "composition": "구도",
+        "sharpness": "선명도",
+        "noise_free": "노이즈",
+        "exposure": "노출",
+        "color_harmony": "색감",
+        "aesthetics": "심미성",
+        "overall": "종합평가"
+    }
+    
     # 프롬프트 템플릿
     PROMPT_TEMPLATE: str = """
-    이 사진을 다음 기준에 따라 1에서 100까지의 점수로 평가해주세요:
+    Please evaluate this image according to the following criteria on a scale of 1 to 100:
     
-    1. 구도(Composition): 사진의 요소들이 얼마나 조화롭게 배치되어 있는지
-    2. 선명도(Sharpness): 사진의 주요 주제가 얼마나 선명하게 촬영되었는지
-    3. 노이즈(Noise): 사진의 품질에 영향을 주는 디지털 노이즈의 정도를 평가해주세요. **노이즈가 적을수록 높은 점수를 주세요. 즉, 깨끗하고 잡음이 없는 사진일수록 더 좋은 점수를 받아야 합니다.**
-    4. 노출(Exposure): 사진의 밝기가 얼마나 적절한지
-    5. 색감(Color Harmony): 색상의 조화가 얼마나 잘 이루어졌는지
-    6. 심미성(Aesthetics): 전반적인 미적 품질
+    1. Composition: How well the elements in the photo are arranged
+    2. Sharpness: How clearly the main subject of the photo is captured
+    3. Noise Free: Evaluate the absence of digital noise in the photo. Give HIGHER scores to images with LESS noise. Clean, noise-free images should receive better scores.
+    4. Exposure: How appropriate the brightness of the photo is
+    5. Color Harmony: How well the colors work together
+    6. Aesthetics: Overall aesthetic quality
     
-    각 항목에 대한 점수와 간략한 설명을 제공해주세요. 결과는 JSON 형식으로 반환해주세요:
+    Provide a score and a brief explanation for each item. Return the results in JSON format:
     {
         "composition": {"score": 0, "comment": ""},
         "sharpness": {"score": 0, "comment": ""},
-        "noise": {"score": 0, "comment": ""},
+        "noise_free": {"score": 0, "comment": ""},
         "exposure": {"score": 0, "comment": ""},
         "color_harmony": {"score": 0, "comment": ""},
         "aesthetics": {"score": 0, "comment": ""},
         "overall": {"score": 0, "comment": ""}
     }
+    
+    Important: Scores should be between 1 and 100. For noise_free, higher scores mean LESS noise (cleaner image).
     """
     
     # Pydantic v2 설정
