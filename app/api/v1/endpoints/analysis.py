@@ -28,21 +28,15 @@ async def analyze_image(request: ImageAnalysisRequest):
     Raises:
         HTTPException: 처리 중 오류 발생 시
     """
-    # 모델 로드 확인
-    if not model_instance.model_loaded:
-        try:
-            logger.info("Model not loaded. Loading model...")
-            if not model_instance.load_model():
-                raise HTTPException(
-                    status_code=503,
-                    detail="Failed to load AI model. Service unavailable."
-                )
-        except Exception as e:
-            logger.error(f"Error loading model: {e}")
-            raise HTTPException(
-                status_code=503,
-                detail="Failed to load AI model. Service unavailable."
-            )
+    try:
+        # 모델 로드 확인
+        await ai_service.ensure_model_loaded()
+    except RuntimeError as e:
+        logger.error(f"Error loading model: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Failed to load AI model. Service unavailable."
+        )
     
     try:
         # 이미지 URL 처리 및 분석

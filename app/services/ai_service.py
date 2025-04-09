@@ -70,24 +70,27 @@ class AIService:
             return None
     
     @staticmethod
-    async def analyze_image(image_path: Path) -> Dict[str, Any]:
+    async def ensure_model_loaded():
         """
-        이미지 분석 수행
+        모델이 로드되었는지 확인하고, 로드되지 않았다면 로드
         
-        Args:
-            image_path (Path): 분석할 이미지 경로
-            
         Returns:
-            Dict[str, Any]: 분석 결과
-        """
-        try:
-            # 이미지 분석
-            result = await model_instance.analyze_image(image_path)
-            return result
+            bool: 모델 로드 성공 여부
             
-        except Exception as e:
-            logger.error(f"Error analyzing image: {e}")
-            raise
+        Raises:
+            RuntimeError: 모델 로드 실패 시
+        """
+        if not model_instance.model_loaded:
+            try:
+                logger.info("Model not loaded. Loading model...")
+                if not model_instance.load_model():
+                    raise RuntimeError("Failed to load AI model.")
+                logger.info("Model loaded successfully.")
+                return True
+            except Exception as e:
+                logger.error(f"Error loading model: {e}")
+                raise RuntimeError(f"Failed to load AI model: {e}")
+        return True
     
     @staticmethod
     async def cleanup_temp_file(file_path: Optional[Path]):
@@ -103,6 +106,32 @@ class AIService:
                 logger.info(f"Temporary file removed: {file_path}")
             except Exception as e:
                 logger.error(f"Error removing temporary file: {e}")
+    
+    @staticmethod
+    async def analyze_image(image_path: Path) -> Dict[str, Any]:
+        """
+        이미지 분석 수행
+        
+        Args:
+            image_path (Path): 분석할 이미지 경로
+            
+        Returns:
+            Dict[str, Any]: 분석 결과
+            
+        Raises:
+            RuntimeError: 분석 오류 발생 시
+        """
+        try:
+            # 모델 로드 상태 확인
+            await AIService.ensure_model_loaded()
+            
+            # 이미지 분석
+            result = await model_instance.analyze_image(image_path)
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error analyzing image: {e}")
+            raise
     
     @staticmethod
     async def process_image_url(image_url: str) -> Dict[str, Any]:

@@ -215,15 +215,8 @@ class ImageAnalysisModel:
         """기본 응답 생성"""
         import random
         
-        # 카테고리 매핑
-        category_mapping = {
-            "composition": "구도",
-            "sharpness": "선명도",
-            "noise_free": "노이즈",
-            "exposure": "노출",
-            "color_harmony": "색감", 
-            "aesthetics": "심미성"
-        }
+        # 카테고리 매핑 - settings에서 가져오기
+        category_mapping = settings.CATEGORY_KOREAN_NAMES
         
         # 분석 텍스트와 차트 데이터 준비
         analysis_text = {}
@@ -266,62 +259,28 @@ class ImageAnalysisModel:
         analysis_text = {}
         analysis_chart = {}
         
-        # 한글 카테고리 매핑
-        category_mapping = {
-            "composition": "구도",
-            "sharpness": "선명도",
-            "noise_free": "노이즈",
-            "exposure": "노출",
-            "color_harmony": "색감", 
-            "aesthetics": "심미성"
-        }
-        
-        # 로그 추가
-        import random
+        # 한글 카테고리 매핑 - settings에서 가져오기
+        category_mapping = settings.CATEGORY_KOREAN_NAMES
         
         # 각 평가 카테고리 처리
         for category in settings.EVALUATION_CATEGORIES:
             if category in result and isinstance(result[category], dict):
                 cat_result = result[category]
                 
-                # 점수 확인 및 조정
-                score = cat_result.get("score", 50)
-                if not isinstance(score, (int, float)):
-                    score = 50
-                
-                # 1-10 점수를 1-100 점수로 변환
-                if 1 <= score <= 10:
-                    # 단순히 10을 곱하는 것이 아니라 분포를 가진 점수로 변환
-                    base_score = int(score * 10)  # 기본 점수 (10점은 100점)
-                    
-                    # 1-7점의 경우: 분포를 가진 랜덤 점수 생성
-                    if score < 8:
-                        variation = random.randint(-5, 5)  # -5 ~ +5 사이의 변동
-                        final_score = max(1, min(100, base_score + variation))
-                    # 8-10점의 경우: 더 작은 범위의 변동 적용 (높은 점수 유지)
-                    else:
-                        variation = random.randint(-3, 3)  # -3 ~ +3 사이의 작은 변동
-                        final_score = max(70, min(100, base_score + variation))
-                    
-                    score = final_score
-                
-                # 최종 점수 범위 확인
-                score = max(1, min(100, int(score)))
+                # 점수 확인 및 조정 (유틸리티 함수 사용)
+                from app.utils.helper import scale_score
+                score = scale_score(cat_result.get("score", 50))
                 
                 # 코멘트 확인
                 comment = cat_result.get("comment", "")
                 if not isinstance(comment, str):
                     comment = str(comment)
                 
-                # 번역 적용
-                from app.utils.translator import translate_text
-                translated_comment = translate_text(comment, source_lang="en", target_lang="ko")
-                
                 # 한글 카테고리로 변환
                 kor_category = category_mapping.get(category, category)
                 
                 # 분석 텍스트와 차트에 저장
-                analysis_text[kor_category] = translated_comment
+                analysis_text[kor_category] = comment
                 analysis_chart[kor_category] = score
             else:
                 # 카테고리가 없으면 기본값 설정
@@ -335,35 +294,14 @@ class ImageAnalysisModel:
             overall_score = 50
             overall_comment = "이미지에 대한 전체적인 평가 정보를 제공하지 못했습니다."
         else:
-            # 전체 점수 확인 및 조정
-            overall_score = overall.get("score", 50)
-            if not isinstance(overall_score, (int, float)):
-                overall_score = 50
+            # 전체 점수 확인 및 조정 (유틸리티 함수 사용)
+            from app.utils.helper import scale_score
+            overall_score = scale_score(overall.get("score", 50))
             
-            # 1-10 점수를 1-100 점수로 변환
-            if 1 <= overall_score <= 10:
-                # 단순히 10을 곱하는 것이 아니라 분포를 가진 점수로 변환
-                base_score = int(overall_score * 10)  # 기본 점수 (10점은 100점)
-                
-                # 점수에 따라 다른 변동 적용
-                if overall_score < 8:
-                    variation = random.randint(-5, 5)  # -5 ~ +5 사이의 변동
-                    final_score = max(1, min(100, base_score + variation))
-                else:
-                    variation = random.randint(-3, 3)  # -3 ~ +3 사이의 작은 변동
-                    final_score = max(70, min(100, base_score + variation))
-                
-                overall_score = final_score
-            
-            # 최종 점수 범위 확인
-            overall_score = max(1, min(100, int(overall_score)))
-            
-            # 전체 코멘트 번역
-            from app.utils.translator import translate_text
+            # 전체 코멘트 가져오기
             overall_comment = overall.get("comment", "")
             if not isinstance(overall_comment, str):
                 overall_comment = str(overall_comment)
-            overall_comment = translate_text(overall_comment, source_lang="en", target_lang="ko")
         
         # 해시태그 처리
         hashtags = result.get("hashtags", [])
@@ -371,24 +309,27 @@ class ImageAnalysisModel:
             # 모델이 해시태그를 제공하지 않은 경우, 기본 해시태그 생성
             hashtags = ["사진", "포토", "이미지"]
         
-        # 해시태그 번역
-        translated_hashtags = []
-        for tag in hashtags[:4]:  # 최대 4개로 제한
-            if tag and isinstance(tag, str):
-                # 영어 태그를 한글로 번역
-                translated_tag = translate_text(tag, source_lang="en", target_lang="ko")
-                translated_hashtags.append(translated_tag)
+        # 해시태그는 최대 4개로 제한
+        hashtags = hashtags[:4]
         
         # 해시태그 수가 부족하면 기본 태그 추가
-        while len(translated_hashtags) < 3:
-            if "사진" not in translated_hashtags:
-                translated_hashtags.append("사진")
-            elif "포토" not in translated_hashtags:
-                translated_hashtags.append("포토")
-            elif "이미지" not in translated_hashtags:
-                translated_hashtags.append("이미지")
+        while len(hashtags) < 3:
+            if "사진" not in hashtags:
+                hashtags.append("사진")
+            elif "포토" not in hashtags:
+                hashtags.append("포토")
+            elif "이미지" not in hashtags:
+                hashtags.append("이미지")
             else:
                 break
+        
+        # 일괄 번역 처리
+        from app.utils.translator import translate_dict_values, translate_batch
+        
+        # 코멘트와 해시태그 번역
+        analysis_text = translate_dict_values(analysis_text)
+        overall_comment = translate_dict_values({"comment": overall_comment})["comment"]
+        translated_hashtags = translate_batch(hashtags)
         
         # 결과 형식화
         formatted_result = {
@@ -396,7 +337,7 @@ class ImageAnalysisModel:
             "comment": overall_comment,
             "analysisText": analysis_text,
             "analysisChart": analysis_chart,
-            "hashTag": translated_hashtags[:4]  # 최대 4개로 제한
+            "hashTag": translated_hashtags
         }
         
         return formatted_result
