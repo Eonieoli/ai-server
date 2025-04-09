@@ -3,9 +3,17 @@
 """
 import os
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class EvaluationCategory:
+    """평가 카테고리 클래스"""
+    def __init__(self, key: str, korean_name: str, description_en: str):
+        self.key = key
+        self.korean_name = korean_name
+        self.description_en = description_en
 
 
 class Settings(BaseSettings):
@@ -34,7 +42,7 @@ class Settings(BaseSettings):
     def MODEL_CACHE_DIR(self) -> Path:
         return self.ROOT_DIR / "models" / "downloads"
     
-    USE_GPU: bool = Field(default=True)  # 기본값은 CPU 사용
+    USE_GPU: bool = Field(default=True)  # GPU 사용 여부
     GPU_DEVICE: int = Field(default=0)    # GPU 장치 번호 (0부터 시작)
     
     # 임시 파일 디렉토리
@@ -45,51 +53,99 @@ class Settings(BaseSettings):
     # 최대 이미지 크기 제한 (바이트 단위, 기본 20MB)
     MAX_IMAGE_SIZE: int = 20 * 1024 * 1024
     
-    # 평가 카테고리
-    EVALUATION_CATEGORIES: List[str] = [
-        "composition",      # 구도
-        "sharpness",        # 선명도
-        "subject",          # 주제
-        "exposure",         # 노출
-        "color_harmony",    # 색감
-        "aesthetic_quality" # 미적 감각
+    # 평가 카테고리 정의
+    _EVALUATION_CATEGORIES = [
+        EvaluationCategory(
+            key="composition",
+            korean_name="구도",
+            description_en="How well the elements in the photo are arranged"
+        ),
+        EvaluationCategory(
+            key="sharpness",
+            korean_name="선명도",
+            description_en="How clearly the main subject of the photo is captured"
+        ),
+        EvaluationCategory(
+            key="subject",
+            korean_name="주제",
+            description_en="How clear and interesting the main subject of the photo is"
+        ),
+        EvaluationCategory(
+            key="exposure",
+            korean_name="노출",
+            description_en="How appropriate the brightness of the photo is"
+        ),
+        EvaluationCategory(
+            key="color_harmony",
+            korean_name="색감",
+            description_en="How well the colors work together"
+        ),
+        EvaluationCategory(
+            key="aesthetic_quality",
+            korean_name="미적 감각",
+            description_en="The overall aesthetic value, artistic merit, and emotional impact of the photo"
+        )
     ]
     
-    # 평가 카테고리 한글명
-    CATEGORY_KOREAN_NAMES: Dict[str, str] = {
-        "composition": "구도",
-        "sharpness": "선명도",
-        "subject": "주제",
-        "exposure": "노출",
-        "color_harmony": "색감",
-        "aesthetic_quality": "미적 감각",
-        "overall": "종합평가"
+    # 오버롤 카테고리 (별도 관리)
+    _OVERALL_CATEGORY = EvaluationCategory(
+        key="overall",
+        korean_name="종합평가",
+        description_en="Overall assessment of the photo"
+    )
+    
+    # 평가 카테고리 키 목록
+    @property
+    def EVALUATION_CATEGORIES(self) -> List[str]:
+        return [category.key for category in self._EVALUATION_CATEGORIES]
+    
+    # 카테고리 한글명 매핑
+    @property
+    def CATEGORY_KOREAN_NAMES(self) -> Dict[str, str]:
+        mapping = {category.key: category.korean_name for category in self._EVALUATION_CATEGORIES}
+        mapping[self._OVERALL_CATEGORY.key] = self._OVERALL_CATEGORY.korean_name
+        return mapping
+    
+    # 기본 오류 메시지 (영어)
+    DEFAULT_ERROR_MESSAGES_EN: Dict[str, str] = {
+        "composition": "Could not analyze the composition.",
+        "sharpness": "Could not evaluate the sharpness.",
+        "subject": "Could not evaluate the subject.",
+        "exposure": "Could not evaluate the exposure.",
+        "color_harmony": "Could not evaluate the color harmony.",
+        "aesthetic_quality": "Could not evaluate the aesthetic quality.",
+        "overall": "An error occurred while analyzing the image."
     }
     
-    # 프롬프트 템플릿
-    PROMPT_TEMPLATE: str = """
+    # 기본 해시태그 (영어)
+    DEFAULT_HASHTAGS_EN: List[str] = ["photo", "image", "analysis", "art"]
+    
+    # 프롬프트 템플릿 생성
+    @property
+    def PROMPT_TEMPLATE(self) -> str:
+        # 카테고리 설명 부분 생성
+        category_descriptions = []
+        for i, category in enumerate(self._EVALUATION_CATEGORIES, 1):
+            category_descriptions.append(f"{i}. {category.key.replace('_', ' ').title()}: {category.description_en}")
+        
+        # JSON 예시 부분 생성
+        json_example_parts = []
+        for category in self._EVALUATION_CATEGORIES:
+            json_example_parts.append(f'        "{category.key}": {{"score": 0, "comment": ""}}')    
+        json_example_parts.append(f'        "{self._OVERALL_CATEGORY.key}": {{"score": 0, "comment": ""}}')    
+        json_example_parts.append('        "hashtags": ["", "", "", ""]')
+        json_example = '{\\n' + ',\\n'.join(json_example_parts) + '\\n    }'
+        
+        # 전체 템플릿 생성
+        return f"""
     Please evaluate this image according to the following criteria on a scale of 1 to 100:
     
-    1. Composition: How well the elements in the photo are arranged
-    2. Sharpness: How clearly the main subject of the photo is captured
-    3. Subject: How clear and interesting the main subject of the photo is
-    4. Exposure: How appropriate the brightness of the photo is
-    5. Color Harmony: How well the colors work together
-    6. Aesthetic Quality: The overall aesthetic value, artistic merit, and emotional impact of the photo
+    {"\\n    ".join(category_descriptions)}
     
     Also, please suggest up to 4 relevant hashtags that describe the content, style, or subject of this image.
     
     Provide a score and a brief explanation for each item. Return the results in JSON format:
-    {
-        "composition": {"score": 0, "comment": ""},
-        "sharpness": {"score": 0, "comment": ""},
-        "subject": {"score": 0, "comment": ""},
-        "exposure": {"score": 0, "comment": ""},
-        "color_harmony": {"score": 0, "comment": ""},
-        "aesthetic_quality": {"score": 0, "comment": ""},
-        "overall": {"score": 0, "comment": ""},
-        "hashtags": ["", "", "", ""]
-    }
+    {json_example}
     
     Important: Scores should be between 1 and 100.
     """

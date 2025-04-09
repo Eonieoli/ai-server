@@ -4,7 +4,7 @@
 import logging
 import requests
 import json
-from typing import Optional
+from typing import Dict, Any, List, Optional, Union
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -38,23 +38,15 @@ def translate_text(text: str, source_lang: str = "en", target_lang: str = "ko") 
         # Google Cloud Translation API v2 호출
         url = "https://translation.googleapis.com/language/translate/v2"
         
-        # 요청 파라미터
-        params = {
-            "key": api_key
-        }
-        
-        # 요청 본문
+        # 요청 파라미터와 본문
+        params = {"key": api_key}
         data = {
-            "q": text,  # 번역할 텍스트
-            "source": source_lang,  # 원본 언어
-            "target": target_lang,  # 목표 언어
-            "format": "text"  # 텍스트 형식 (html 또는 text)
+            "q": text,
+            "source": source_lang,
+            "target": target_lang,
+            "format": "text"
         }
-        
-        # 요청 헤더
-        headers = {
-            "Content-Type": "application/json"
-        }
+        headers = {"Content-Type": "application/json"}
         
         # API 호출
         response = requests.post(
@@ -69,31 +61,31 @@ def translate_text(text: str, source_lang: str = "en", target_lang: str = "ko") 
             result = response.json()
             if "data" in result and "translations" in result["data"] and len(result["data"]["translations"]) > 0:
                 translated_text = result["data"]["translations"][0]["translatedText"]
-                logger.info(f"Text translated successfully: {len(text)} chars")
+                logger.debug(f"Text translated successfully: {len(text)} chars")
                 return translated_text
-            else:
-                logger.error(f"Unexpected response format: {result}")
-                return text
+            
+            logger.error(f"Unexpected response format: {result}")
         else:
             logger.error(f"Translation API error: {response.status_code} - {response.text}")
-            return text
+        
+        return text
             
     except Exception as e:
         logger.error(f"Error in translation: {str(e)}")
         return text
 
 
-def translate_batch(items: list, source_lang: str = "en", target_lang: str = "ko") -> list:
+def translate_batch(items: List[str], source_lang: str = "en", target_lang: str = "ko") -> List[str]:
     """
     여러 텍스트를 일괄적으로 번역
     
     Args:
-        items (list): 번역할 텍스트 리스트
+        items (List[str]): 번역할 텍스트 리스트
         source_lang (str, optional): 원본 언어 코드. 기본값은 "en".
         target_lang (str, optional): 목표 언어 코드. 기본값은 "ko".
         
     Returns:
-        list: 번역된 텍스트 리스트
+        List[str]: 번역된 텍스트 리스트
     """
     if not items:
         return []
@@ -109,23 +101,28 @@ def translate_batch(items: list, source_lang: str = "en", target_lang: str = "ko
     return result
 
 
-def translate_dict_values(data: dict, keys_to_translate: list = None, source_lang: str = "en", target_lang: str = "ko") -> dict:
+def translate_dict_values(
+    data: Dict[str, Any], 
+    keys_to_translate: Optional[List[str]] = None, 
+    source_lang: str = "en", 
+    target_lang: str = "ko"
+) -> Dict[str, Any]:
     """
     사전의 특정 키에 해당하는 값들을 번역
     
     Args:
-        data (dict): 번역할 값을 포함한 사전
-        keys_to_translate (list, optional): 번역할 키 목록. None이면 모든 문자열 값 번역
+        data (Dict[str, Any]): 번역할 값을 포함한 사전
+        keys_to_translate (Optional[List[str]]): 번역할 키 목록. None이면 모든 문자열 값 번역
         source_lang (str, optional): 원본 언어 코드. 기본값은 "en".
         target_lang (str, optional): 목표 언어 코드. 기본값은 "ko".
         
     Returns:
-        dict: 번역된 값을 포함한 사전
+        Dict[str, Any]: 번역된 값을 포함한 사전
     """
     if not data:
         return {}
     
-    result = data.copy()
+    result = {}
     
     for key, value in data.items():
         if keys_to_translate is None or key in keys_to_translate:
@@ -133,6 +130,34 @@ def translate_dict_values(data: dict, keys_to_translate: list = None, source_lan
                 result[key] = translate_text(value, source_lang, target_lang)
             elif isinstance(value, dict):
                 # 중첩된 사전의 경우 재귀적으로 처리
-                result[key] = translate_dict_values(value, keys_to_translate, source_lang, target_lang)
+                result[key] = translate_dict_values(
+                    value, 
+                    keys_to_translate, 
+                    source_lang, 
+                    target_lang
+                )
+            else:
+                result[key] = value
+        else:
+            result[key] = value
     
     return result
+
+
+def translate_dict(
+    data: Dict[str, Any], 
+    source_lang: str = "en", 
+    target_lang: str = "ko"
+) -> Dict[str, Any]:
+    """
+    사전의 모든 문자열 값을 번역 (간편 함수)
+    
+    Args:
+        data (Dict[str, Any]): 번역할 사전
+        source_lang (str, optional): 원본 언어 코드
+        target_lang (str, optional): 목표 언어 코드
+        
+    Returns:
+        Dict[str, Any]: 번역된 사전
+    """
+    return translate_dict_values(data, None, source_lang, target_lang)
