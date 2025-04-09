@@ -9,6 +9,26 @@ from datetime import datetime, timedelta
 
 from app.core.config import settings
 
+def get_system_info():
+    """시스템 정보를 반환합니다."""
+    import platform
+    import torch
+    
+    system_info = {
+        "python_version": platform.python_version(),
+        "platform": platform.platform(),
+        "pytorch_version": torch.__version__,
+        "cuda_available": torch.cuda.is_available()
+    }
+    
+    if torch.cuda.is_available():
+        system_info.update({
+            "cuda_version": torch.version.cuda if hasattr(torch.version, 'cuda') else "Unknown",
+            "gpu_model": torch.cuda.get_device_name(0) if torch.cuda.device_count() > 0 else "None",
+            "gpu_memory_total": f"{torch.cuda.get_device_properties(0).total_memory / (1024**3):.2f} GB" if torch.cuda.device_count() > 0 else "None"
+        })
+    
+    return system_info
 
 def setup_logging():
     """로깅 설정"""

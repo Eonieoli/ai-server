@@ -6,7 +6,6 @@ import requests
 import json
 from typing import Optional
 from app.core.config import settings
-from app.core.api_keys import get_google_translate_key
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ def translate_text(text: str, source_lang: str = "en", target_lang: str = "ko") 
     
     try:
         # API 키 가져오기
-        api_key = get_google_translate_key()
+        api_key = settings.GOOGLE_TRANSLATE_KEY
         
         # API 키가 없으면 원본 텍스트 반환
         if not api_key:
