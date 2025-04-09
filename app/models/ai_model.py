@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, Union, Optional
 from PIL import Image
 
-from transformers import LlavaNextVideoProcessor, LlavaNextVideoForConditionalGeneration, BitsAndBytesConfig
+from transformers import LlavaProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
 
 from app.core.config import settings
 
@@ -48,7 +48,7 @@ class ImageAnalysisModel:
     def load_model(self):
         """모델 로드 함수 (4비트 양자화 적용)"""
         try:
-            logger.info(f"Loading model {settings.MODEL_NAME} with 4-bit quantization on {self.device}")
+            logger.info(f"Loading model {settings.MODEL_NAME} on {self.device}")
             
             # 모델 캐시 디렉토리 생성
             Path(settings.MODEL_CACHE_DIR).mkdir(parents=True, exist_ok=True)
@@ -61,29 +61,28 @@ class ImageAnalysisModel:
                 bnb_4bit_quant_type="nf4",  # NF4 양자화 타입 사용
             )
             
-            # 모델 로드 (4비트 양자화 적용)
-            self.model = LlavaNextVideoForConditionalGeneration.from_pretrained(
+            # 모델 로드 (양자화 없음)
+            self.model = LlavaForConditionalGeneration.from_pretrained(
                 settings.MODEL_NAME,
-                quantization_config=quantization_config,  # 양자화 설정 적용
                 device_map="auto",                      # 자동 장치 매핑
                 low_cpu_mem_usage=True,
                 cache_dir=settings.MODEL_CACHE_DIR,      # 캐시 디렉토리 지정
                 trust_remote_code=True,                 # 원격 코드 허용
             )
             
-            logger.info("Model loaded using LlavaNextVideoForConditionalGeneration with 4-bit quantization")
+            logger.info("Model loaded using LlavaForConditionalGeneration without quantization")
             
             # 프로세서 로드 (고속 프로세서 사용)
-            self.processor = LlavaNextVideoProcessor.from_pretrained(
+            self.processor = LlavaProcessor.from_pretrained(
                 settings.MODEL_NAME,
                 cache_dir=settings.MODEL_CACHE_DIR,
                 trust_remote_code=True,                   # 원격 코드 허용
                 use_fast=True                            # 고속 프로세서 사용
             )
-            logger.info("Processor loaded using LlavaNextVideoProcessor")
+            logger.info("Processor loaded using LlavaProcessor")
             
             self.model_loaded = True
-            logger.info(f"Model loaded successfully on {self.device} with 4-bit quantization")
+            logger.info(f"Model loaded successfully on {self.device}")
             
             return True
         
@@ -133,32 +132,12 @@ class ImageAnalysisModel:
             image = Image.open(image_path).convert("RGB")
             
             try:
-                # 예제 코드에 따라 chat template을 사용하여 프롬프트 생성
-                conversation = [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": settings.PROMPT_TEMPLATE},
-                            {"type": "image"},  # 이미지를 여기에 넣을 것임
-                        ],
-                    },
-                ]
+                # LLaVA v1.6 모델에 맞는 형식으로 입력 준비
+                # 프롬프트 설정 (LLaVA v1.6은 다른 프롬프트 포맷 사용)
+                prompt = f"<image>\n{settings.PROMPT_TEMPLATE}"
                 
-                prompt = self.processor.apply_chat_template(
-                    conversation, 
-                    add_generation_prompt=True
-                )
-                
-                # 이미지를 numpy 배열로 변환 (processor가 필요로 함)
-                image_np = np.array(image)
-                
-                # 입력 준비
-                inputs = self.processor(
-                    text=prompt, 
-                    images=image_np, 
-                    padding=True, 
-                    return_tensors="pt"
-                ).to(self.device)
+                # 이미지 전처리
+                inputs = self.processor(prompt, image, return_tensors="pt").to(self.device)
                 
                 # 생성
                 with torch.no_grad():
@@ -169,11 +148,13 @@ class ImageAnalysisModel:
                         temperature=0.1
                     )
                 
-                # 응답 디코딩 (예제 코드와 같이 output[0][2:]를 사용)
-                generated_text = self.processor.decode(
-                    output[0][2:], 
-                    skip_special_tokens=True
-                )
+                # 응답 디코딩
+                generated_text = self.processor.decode(output[0], skip_special_tokens=True)
+                
+                # 프롬프트 부분 제거 (프롬프트가 결과에 포함될 수 있음)
+                prompt_prefix = f"<image>\n{settings.PROMPT_TEMPLATE}"
+                if generated_text.startswith(prompt_prefix):
+                    generated_text = generated_text[len(prompt_prefix):].strip()
                 
                 # 로그에 생성된 텍스트 기록
                 logger.info(f"Generated text: {generated_text}")
