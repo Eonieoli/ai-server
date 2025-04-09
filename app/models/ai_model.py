@@ -46,22 +46,22 @@ class ImageAnalysisModel:
         return torch.cuda.is_available()
     
     def load_model(self):
-        """모델 로드 함수 (8비트 양자화 적용)"""
+        """모델 로드 함수 (4비트 양자화 적용)"""
         try:
-            logger.info(f"Loading model {settings.MODEL_NAME} with 8-bit quantization on {self.device}")
+            logger.info(f"Loading model {settings.MODEL_NAME} with 4-bit quantization on {self.device}")
             
             # 모델 캐시 디렉토리 생성
             Path(settings.MODEL_CACHE_DIR).mkdir(parents=True, exist_ok=True)
             
-            # 8비트 양자화 설정
+            # 4비트 양자화 설정
             quantization_config = BitsAndBytesConfig(
-                load_in_8bit=True,           # 8비트 양자화 적용
-                llm_int8_threshold=6.0,      # 임계값 설정 (큰 값 = 더 많은 웨이트 양자화)
-                llm_int8_has_fp16_weight=False,  # 완전 int8 변환
-                llm_int8_skip_modules=None,   # 양자화를 스킵할 모듈 없음
+                load_in_4bit=True,           # 4비트 양자화 적용
+                bnb_4bit_compute_dtype=torch.float16,  # 계산 시 float16 사용
+                bnb_4bit_use_double_quant=True,  # 더블 양자화 적용 (메모리 사용량 절약)
+                bnb_4bit_quant_type="nf4",  # NF4 양자화 타입 사용
             )
             
-            # 모델 로드 (8비트 양자화 적용)
+            # 모델 로드 (4비트 양자화 적용)
             self.model = LlavaNextVideoForConditionalGeneration.from_pretrained(
                 settings.MODEL_NAME,
                 quantization_config=quantization_config,  # 양자화 설정 적용
@@ -71,18 +71,19 @@ class ImageAnalysisModel:
                 trust_remote_code=True,                 # 원격 코드 허용
             )
             
-            logger.info("Model loaded using LlavaNextVideoForConditionalGeneration with 8-bit quantization")
+            logger.info("Model loaded using LlavaNextVideoForConditionalGeneration with 4-bit quantization")
             
-            # 프로세서 로드
+            # 프로세서 로드 (고속 프로세서 사용)
             self.processor = LlavaNextVideoProcessor.from_pretrained(
                 settings.MODEL_NAME,
                 cache_dir=settings.MODEL_CACHE_DIR,
-                trust_remote_code=True                   # 원격 코드 허용
+                trust_remote_code=True,                   # 원격 코드 허용
+                use_fast=True                            # 고속 프로세서 사용
             )
             logger.info("Processor loaded using LlavaNextVideoProcessor")
             
             self.model_loaded = True
-            logger.info(f"Model loaded successfully on {self.device} with 8-bit quantization")
+            logger.info(f"Model loaded successfully on {self.device} with 4-bit quantization")
             
             return True
         
