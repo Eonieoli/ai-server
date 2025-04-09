@@ -1,5 +1,5 @@
 """
-FastAPI 서버 실행 스크립트 (Docker 없이 직접 실행)
+FastAPI 서버 실행 스크립트 (ngrok 연동)
 """
 import os
 import sys
@@ -7,6 +7,7 @@ import platform
 import uvicorn
 import torch
 from pathlib import Path
+from pyngrok import ngrok
 
 def check_environment():
     """실행 환경을 확인하고 출력합니다."""
@@ -21,15 +22,6 @@ def check_environment():
         print(f"GPU model: {torch.cuda.get_device_name(0)}")
         print(f"GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.2f} GB")
     
-    # bitsandbytes 확인
-    try:
-        import bitsandbytes as bnb
-        print(f"bitsandbytes version: {bnb.__version__}")
-        print("4-bit quantization is available")
-    except ImportError:
-        print("WARNING: bitsandbytes not installed. 4-bit quantization will not be available.")
-        print("Please install: pip install bitsandbytes>=0.41.0")
-
     # 디렉토리 확인
     root_dir = Path(__file__).resolve().parent
     print(f"Working directory: {root_dir}")
@@ -43,20 +35,29 @@ def check_environment():
         dir_path.mkdir(parents=True, exist_ok=True)
         print(f"Created/verified directory: {dir_path}")
 
+def run_with_ngrok(port=8000):
+    """ngrok 터널을 생성하고 서버를 실행합니다."""
+    # ngrok 터널 생성
+    public_url = ngrok.connect(port).public_url
+    print(f"\nngrok 터널이 생성되었습니다: {public_url}")
+    print(f"API 문서: {public_url}/docs")
+    
+    # 서버 실행
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, workers=1)
+
 if __name__ == "__main__":
     # 환경 확인
     check_environment()
     
-    # GPU 설정
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # 원하는 GPU 인덱스로 변경하세요
+    # GPU 설정 (Colab에서는 하나만 있음)
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     # 서버 설정
-    host = "0.0.0.0"  # 모든 네트워크 인터페이스에서 접근 가능
-    port = 8000        # 포트 번호
+    port = 8000
 
-    print(f"\nStarting AI server on {host}:{port}")
-    print(f"Using GPU: CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set')}")
+    print(f"\nStarting AI server with ngrok tunnel")
+    print(f"Using GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'None'}")
     print("Server will start with 8-bit quantized LLaVA-NeXT-Video-7B model")
 
-    # 서버 실행
-    uvicorn.run("app.main:app", host=host, port=port, workers=1)
+    # ngrok으로 실행
+    run_with_ngrok(port)

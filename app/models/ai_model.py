@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Any, Union, Optional
 from PIL import Image
 
-from transformers import LlavaNextVideoProcessor, LlavaNextVideoForConditionalGeneration
+from transformers import LlavaNextVideoProcessor, LlavaNextVideoForConditionalGeneration, BitsAndBytesConfig
 
 from app.core.config import settings
 
@@ -46,31 +46,43 @@ class ImageAnalysisModel:
         return torch.cuda.is_available()
     
     def load_model(self):
-        """모델 로드 함수"""
+        """모델 로드 함수 (8비트 양자화 적용)"""
         try:
-            logger.info(f"Loading model {settings.MODEL_NAME} on {self.device}")
+            logger.info(f"Loading model {settings.MODEL_NAME} with 8-bit quantization on {self.device}")
             
             # 모델 캐시 디렉토리 생성
             Path(settings.MODEL_CACHE_DIR).mkdir(parents=True, exist_ok=True)
             
-            # 모델 로드 (예제 코드 기반)
+            # 8비트 양자화 설정
+            quantization_config = BitsAndBytesConfig(
+                load_in_8bit=True,           # 8비트 양자화 적용
+                llm_int8_threshold=6.0,      # 임계값 설정 (큰 값 = 더 많은 웨이트 양자화)
+                llm_int8_has_fp16_weight=False,  # 완전 int8 변환
+                llm_int8_skip_modules=None,   # 양자화를 스킵할 모듈 없음
+            )
+            
+            # 모델 로드 (8비트 양자화 적용)
             self.model = LlavaNextVideoForConditionalGeneration.from_pretrained(
                 settings.MODEL_NAME,
-                torch_dtype=torch.float16 if self.device.type == "cuda" else torch.float32,
+                quantization_config=quantization_config,  # 양자화 설정 적용
+                device_map="auto",                      # 자동 장치 매핑
                 low_cpu_mem_usage=True,
-            ).to(self.device)
+                cache_dir=settings.MODEL_CACHE_DIR,      # 캐시 디렉토리 지정
+                trust_remote_code=True,                 # 원격 코드 허용
+            )
             
-            logger.info("Model loaded using LlavaNextVideoForConditionalGeneration")
+            logger.info("Model loaded using LlavaNextVideoForConditionalGeneration with 8-bit quantization")
             
             # 프로세서 로드
             self.processor = LlavaNextVideoProcessor.from_pretrained(
                 settings.MODEL_NAME,
-                cache_dir=settings.MODEL_CACHE_DIR
+                cache_dir=settings.MODEL_CACHE_DIR,
+                trust_remote_code=True                   # 원격 코드 허용
             )
             logger.info("Processor loaded using LlavaNextVideoProcessor")
             
             self.model_loaded = True
-            logger.info(f"Model loaded successfully on {self.device}")
+            logger.info(f"Model loaded successfully on {self.device} with 8-bit quantization")
             
             return True
         
