@@ -222,19 +222,29 @@ class ImageAnalysisModel:
         analysis_text = {}
         analysis_chart = {}
         
+        # 기본 분석 메시지
+        default_messages = {
+            "구도": "Could not analyze the composition.",
+            "선명도": "Could not evaluate the sharpness.",
+            "주제": "Could not evaluate the subject.",
+            "노출": "Could not evaluate the exposure.",
+            "색감": "Could not evaluate the color harmony.",
+            "미적 감각": "Could not evaluate the aesthetic quality."
+        }
+        
         # 랜덤 점수로 각 카테고리 채우기
         for category in settings.EVALUATION_CATEGORIES:
             kor_category = category_mapping.get(category, category)
             score = random.randint(30, 70)
-            analysis_text[kor_category] = "평가 실패"
+            analysis_text[kor_category] = default_messages.get(kor_category, "평가 실패")
             analysis_chart[kor_category] = score
         
         # 종합 점수와 코멘트
         overall_score = random.randint(30, 70)
-        overall_comment = "이미지를 분석하는 동안 오류가 발생했습니다."
+        overall_comment = "An error occurred while analyzing the image."
         
         # 기본 해시태그
-        hashtags = ["사진", "이미지", "분석"]
+        hashtags = ["photo", "image", "analysis", "art"]
         
         # 최종 결과 조합
         return {

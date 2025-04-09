@@ -47,22 +47,22 @@ class Settings(BaseSettings):
     
     # 평가 카테고리
     EVALUATION_CATEGORIES: List[str] = [
-        "composition",     # 구도
-        "sharpness",       # 선명도
-        "noise_free",      # 노이즈 없음
-        "exposure",        # 노출
-        "color_harmony",   # 색감
-        "aesthetics"       # 심미성
+        "composition",      # 구도
+        "sharpness",        # 선명도
+        "subject",          # 주제
+        "exposure",         # 노출
+        "color_harmony",    # 색감
+        "aesthetic_quality" # 미적 감각
     ]
     
     # 평가 카테고리 한글명
     CATEGORY_KOREAN_NAMES: Dict[str, str] = {
         "composition": "구도",
         "sharpness": "선명도",
-        "noise_free": "노이즈",
+        "subject": "주제",
         "exposure": "노출",
         "color_harmony": "색감",
-        "aesthetics": "심미성",
+        "aesthetic_quality": "미적 감각",
         "overall": "종합평가"
     }
     
@@ -72,10 +72,10 @@ class Settings(BaseSettings):
     
     1. Composition: How well the elements in the photo are arranged
     2. Sharpness: How clearly the main subject of the photo is captured
-    3. Noise Free: Evaluate the absence of digital noise in the photo. Give HIGHER scores to images with LESS noise. Clean, noise-free images should receive better scores.
+    3. Subject: How clear and interesting the main subject of the photo is
     4. Exposure: How appropriate the brightness of the photo is
     5. Color Harmony: How well the colors work together
-    6. Aesthetics: Overall aesthetic quality
+    6. Aesthetic Quality: The overall aesthetic value, artistic merit, and emotional impact of the photo
     
     Also, please suggest up to 4 relevant hashtags that describe the content, style, or subject of this image.
     
@@ -83,15 +83,15 @@ class Settings(BaseSettings):
     {
         "composition": {"score": 0, "comment": ""},
         "sharpness": {"score": 0, "comment": ""},
-        "noise_free": {"score": 0, "comment": ""},
+        "subject": {"score": 0, "comment": ""},
         "exposure": {"score": 0, "comment": ""},
         "color_harmony": {"score": 0, "comment": ""},
-        "aesthetics": {"score": 0, "comment": ""},
+        "aesthetic_quality": {"score": 0, "comment": ""},
         "overall": {"score": 0, "comment": ""},
         "hashtags": ["", "", "", ""]
     }
     
-    Important: Scores should be between 1 and 100. For noise_free, higher scores mean LESS noise (cleaner image).
+    Important: Scores should be between 1 and 100.
     """
     
     # Pydantic v2 설정
