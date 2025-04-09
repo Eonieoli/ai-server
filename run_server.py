@@ -25,10 +25,10 @@ def check_environment():
     try:
         import bitsandbytes as bnb
         print(f"bitsandbytes version: {bnb.__version__}")
-        print("4-bit quantization is available")
+        print("8-bit quantization is available")
     except ImportError:
-        print("WARNING: bitsandbytes not installed. 4-bit quantization will not be available.")
-        print("Please install: pip install bitsandbytes>=0.41.0")
+        print("WARNING: bitsandbytes not installed. 8-bit quantization will not be available.")
+        print("Please install: pip install bitsandbytes>=0.39.0")
 
     # 디렉토리 확인
     root_dir = Path(__file__).resolve().parent
