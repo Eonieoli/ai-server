@@ -12,7 +12,7 @@ class AnalysisText(BaseModel):
     주제: str
     노출: str
     색감: str
-    미적감각: str = Field(alias="미적 감각")
+    미적감각: str
 
 
 class AnalysisChart(BaseModel):
@@ -22,16 +22,17 @@ class AnalysisChart(BaseModel):
     주제: int
     노출: int
     색감: int
-    미적감각: int = Field(alias="미적 감각")
+    미적감각: int
 
 
 class ImageAnalysisResponse(BaseModel):
     """이미지 분석 응답 스키마"""
-    score: int = Field(..., description="종합 점수")
-    comment: str = Field(..., description="종합 평가 코멘트")
-    analysisText: AnalysisText = Field(..., description="각 항목별 평가 텍스트")
-    analysisChart: AnalysisChart = Field(..., description="각 항목별 평가 점수")
-    hashTag: List[str] = Field(..., description="관련 해시태그")
+    score: int
+    comment: str
+    analysisText: AnalysisText
+    analysisChart: AnalysisChart
+    hashTag: List[str]
+    version: int = 2
 
 
 class HealthResponse(BaseModel):

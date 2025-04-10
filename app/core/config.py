@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     GOOGLE_TRANSLATE_KEY: Optional[str] = None
     
     # AI 모델 관련 설정
-    MODEL_NAME: str = "llava-hf/LLaVA-NeXT-Video-7B-hf"
+    MODEL_NAME: str = "llava-hf/llava-1.5-7b-hf"
     
     @property
     def MODEL_CACHE_DIR(self) -> Path:
@@ -53,101 +53,117 @@ class Settings(BaseSettings):
     # 최대 이미지 크기 제한 (바이트 단위, 기본 20MB)
     MAX_IMAGE_SIZE: int = 20 * 1024 * 1024
     
-    # 평가 카테고리 정의
-    _EVALUATION_CATEGORIES = [
-        EvaluationCategory(
-            key="composition",
-            korean_name="구도",
-            description_en="How well the elements in the photo are arranged"
-        ),
-        EvaluationCategory(
-            key="sharpness",
-            korean_name="선명도",
-            description_en="How clearly the main subject of the photo is captured"
-        ),
-        EvaluationCategory(
-            key="subject",
-            korean_name="주제",
-            description_en="How clear and interesting the main subject of the photo is"
-        ),
-        EvaluationCategory(
-            key="exposure",
-            korean_name="노출",
-            description_en="How appropriate the brightness of the photo is"
-        ),
-        EvaluationCategory(
-            key="color_harmony",
-            korean_name="색감",
-            description_en="How well the colors work together"
-        ),
-        EvaluationCategory(
-            key="aesthetic_quality",
-            korean_name="미적 감각",
-            description_en="The overall aesthetic value, artistic merit, and emotional impact of the photo"
-        )
+    # 평가 카테고리
+    EVALUATION_CATEGORIES: List[str] = [
+        "composition",      # 구도
+        "sharpness",        # 선명도
+        "subject",          # 주제
+        "exposure",         # 노출
+        "color_harmony",    # 색감
+        "aesthetic_quality" # 미적감각
     ]
     
-    # 오버롤 카테고리 (별도 관리)
-    _OVERALL_CATEGORY = EvaluationCategory(
-        key="overall",
-        korean_name="종합평가",
-        description_en="Overall assessment of the photo"
-    )
-    
-    # 평가 카테고리 키 목록
-    @property
-    def EVALUATION_CATEGORIES(self) -> List[str]:
-        return [category.key for category in self._EVALUATION_CATEGORIES]
-    
-    # 카테고리 한글명 매핑
-    @property
-    def CATEGORY_KOREAN_NAMES(self) -> Dict[str, str]:
-        mapping = {category.key: category.korean_name for category in self._EVALUATION_CATEGORIES}
-        mapping[self._OVERALL_CATEGORY.key] = self._OVERALL_CATEGORY.korean_name
-        return mapping
-    
-    # 기본 오류 메시지 (영어)
-    DEFAULT_ERROR_MESSAGES_EN: Dict[str, str] = {
-        "composition": "Could not analyze the composition.",
-        "sharpness": "Could not evaluate the sharpness.",
-        "subject": "Could not evaluate the subject.",
-        "exposure": "Could not evaluate the exposure.",
-        "color_harmony": "Could not evaluate the color harmony.",
-        "aesthetic_quality": "Could not evaluate the aesthetic quality.",
-        "overall": "An error occurred while analyzing the image."
+    # 평가 카테고리 한글명
+    CATEGORY_KOREAN_NAMES: Dict[str, str] = {
+        "composition": "구도",
+        "sharpness": "선명도",
+        "subject": "주제",
+        "exposure": "노출",
+        "color_harmony": "색감",
+        "aesthetic_quality": "미적감각",
+        "overall": "종합평가"
     }
     
     # 기본 해시태그 (영어)
     DEFAULT_HASHTAGS_EN: List[str] = ["photo", "image", "analysis", "art"]
     
-    # 프롬프트 템플릿 생성
-    @property
-    def PROMPT_TEMPLATE(self) -> str:
-        # 카테고리 설명 부분 생성
-        category_descriptions = []
-        for i, category in enumerate(self._EVALUATION_CATEGORIES, 1):
-            category_descriptions.append(f"{i}. {category.key.replace('_', ' ').title()}: {category.description_en}")
-        
-        # JSON 예시 부분 생성
-        json_example_parts = []
-        for category in self._EVALUATION_CATEGORIES:
-            json_example_parts.append(f'        "{category.key}": {{"score": 0, "comment": ""}}')    
-        json_example_parts.append(f'        "{self._OVERALL_CATEGORY.key}": {{"score": 0, "comment": ""}}')    
-        json_example_parts.append('        "hashtags": ["", "", "", ""]')
-        json_example = '{\\n' + ',\\n'.join(json_example_parts) + '\\n    }'
-        
-        # 전체 템플릿 생성
-        return f"""
-    Please evaluate this image according to the following criteria on a scale of 1 to 100:
-    
-    {"\\n    ".join(category_descriptions)}
-    
-    Also, please suggest up to 4 relevant hashtags that describe the content, style, or subject of this image.
-    
-    Provide a score and a brief explanation for each item. Return the results in JSON format:
-    {json_example}
-    
-    Important: Scores should be between 1 and 100.
+    # 프롬프트 템플릿
+    PROMPT_TEMPLATE: str = """
+    Please evaluate the given image using the following six criteria. For each criterion, provide an integer score from 1 to 100, based on the detailed sub-criteria below. DO NOT USE ROUNDED SCORES ENDING IN 0 OR 5 (like 60, 65, 70, 75, 80). Instead, use precise values like 63, 72, 84, 97, etc.
+
+    For each item, return a short feedback sentence along with the score, in the format:  
+    "criterion_name": {"score": integer, "comment": "brief constructive suggestion"}
+
+    Be analytical and constructive — avoid emotional or poetic language. Give practical feedback that could help improve the image if revised.
+
+    ### Evaluation Criteria:
+
+    1. **Composition** (Max 100 points)
+    - Rule of thirds or centered framing clearly applied (25 pts)
+    - Natural leading lines guide the viewer’s eyes (25 pts)
+    - Use of framing elements (doorways, trees, etc.) to emphasize subject (25 pts)
+    - Overall balance and visual flow (25 pts)
+
+    2. **Sharpness** (Max 100 points)
+    - Subject is clearly focused (40 pts)
+    - Blur appears intentional (e.g., bokeh) (30 pts)
+    - Textures and fine details are preserved (30 pts)
+
+    3. **Subject** (Max 100 points)
+    - Subject is clearly defined (50 pts)
+    - The photo evokes emotion or conveys a message (30 pts)
+    - Background complements the subject (20 pts)
+
+    4. **Exposure** (Max 100 points)
+    - No blown highlights (30 pts)
+    - No loss of detail in shadows (30 pts)
+    - Well-balanced contrast and brightness (40 pts)
+
+    5. **Color Harmony** (Max 100 points)
+    - Natural and undistorted color rendering (40 pts)
+    - Appropriate saturation levels (30 pts)
+    - Visually pleasing color combinations (30 pts)
+
+    6. **Aesthetic Quality** (Max 100 points)
+    - Overall visual beauty and impact (40 pts)
+    - Emotional/storytelling depth (30 pts)
+    - Creative or original visual approach (30 pts)
+
+    ---
+
+    **VERY IMPORTANT**
+    - ALL SCORES MUST NOT END IN 0 OR 5. Never use scores like 70, 75, 80, 85, 90! Always use specific values like 73, 82, 91, etc.
+    - The "hashtags" field MUST be an array of simple strings WITHOUT the '#' symbol. Example: ["nature", "portrait", "sunset"] NOT ["#nature", "#portrait", "#sunset"]
+    - The output must be valid JSON, parseable using Python's `json.loads()`. No trailing commas, proper nesting of braces.
+    - The "overall" score should be a weighted average of the other scores (not ending in 0 or 5).
+
+    ---
+
+    ### 📌 Example evaluation:
+    Image description: *A woman walking in a park under bright sunlight, with trees and greenery in the background.*
+
+    ```json
+    {
+    "composition": {
+        "score": 82,
+        "comment": "The subject is well-placed using the rule of thirds, but leading lines could be stronger."
+    },
+    "sharpness": {
+        "score": 89,
+        "comment": "The focus is sharp and textures on the subject’s clothing are clearly visible."
+    },
+    "subject": {
+        "score": 84,
+        "comment": "The subject is clearly the woman, and the scene conveys a peaceful mood."
+    },
+    "exposure": {
+        "score": 78,
+        "comment": "The image is slightly overexposed in some highlights; a lower ISO could help."
+    },
+    "color_harmony": {
+        "score": 91,
+        "comment": "The natural greens and skin tones work well together with no color distortion."
+    },
+    "aesthetic_quality": {
+        "score": 87,
+        "comment": "The image has a warm, pleasant feel and a good balance of emotion and beauty."
+    },
+    "overall": {
+        "score": 86,
+        "comment": "A well-composed and vibrant image that effectively captures a calm outdoor moment."
+    },
+    "hashtags": ["sunnyday", "parkportrait", "naturewalk", "outdoorvibes"]
+    }
     """
     
     # Pydantic v2 설정
