@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, Any, Union, Optional
 from PIL import Image
 
-from transformers import LlavaProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
+from transformers import AutoProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
 
 from app.core.config import settings
 
@@ -76,12 +76,12 @@ class ImageAnalysisModel:
             logger.info("Model loaded using LlavaForConditionalGeneration with 4-bit quantization")
             
             # 프로세서 로드
-            self.processor = LlavaProcessor.from_pretrained(
+            self.processor = AutoProcessor.from_pretrained(
                 settings.MODEL_NAME,
                 cache_dir=settings.MODEL_CACHE_DIR,
                 trust_remote_code=True                  # 원격 코드 허용
             )
-            logger.info("Processor loaded using LlavaProcessor")
+            logger.info("Processor loaded using AutoProcessor")
             
             self.model_loaded = True
             logger.info(f"Model loaded successfully on {self.device} with 4-bit quantization")
@@ -134,21 +134,39 @@ class ImageAnalysisModel:
             image = Image.open(image_path).convert("RGB")
             
             try:
-                # 공식 문서와 기타 참고자료에 따른 정확한 사용법
-                # 프롬프트에 <image> 토큰을 사용하는 것이 중요
-                prompt = f"<image>\n{settings.PROMPT_TEMPLATE}"
+                # LLaVA 공식 예제 방식에 따른 처리
+                # 대화 형식의 입력 구조
+                conversation = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": settings.PROMPT_TEMPLATE},
+                            {"type": "image"}  # 이미지가 여기에 삽입됨
+                        ],
+                    },
+                ]
                 
-                # 이미지와 텍스트 입력 준비
-                inputs = self.processor(text=prompt, images=image, return_tensors="pt")
+                # 대화 템플릿 적용
+                prompt = self.processor.apply_chat_template(
+                    conversation, 
+                    add_generation_prompt=True
+                )
                 
-                # GPU로 입력 이동
+                # 이미지와 프롬프트로 입력 생성
+                inputs = self.processor(
+                    images=image, 
+                    text=prompt, 
+                    return_tensors="pt"
+                )
+                
+                # 장치로 이동
                 for k, v in inputs.items():
                     if isinstance(v, torch.Tensor):
                         inputs[k] = v.to(self.device)
                 
                 # 생성 실행
                 with torch.no_grad():
-                    output_ids = self.model.generate(
+                    output = self.model.generate(
                         **inputs,
                         max_new_tokens=512,
                         do_sample=True,
@@ -157,12 +175,8 @@ class ImageAnalysisModel:
                         repetition_penalty=1.2
                     )
                 
-                # 응답 전체 디코딩
-                generated_text = self.processor.batch_decode(output_ids, skip_special_tokens=True)[0]
-                
-                # 프롬프트 제거 시도 (필요한 경우)
-                if prompt in generated_text:
-                    generated_text = generated_text.replace(prompt, "").strip()
+                # 특수 토큰 제외하고 응답만 추출 (토큰 인덱스 2 이후)
+                generated_text = self.processor.decode(output[0][2:], skip_special_tokens=True)
                 
                 # 로그에 생성된 텍스트 기록
                 logger.info(f"Generated text: {generated_text}")
