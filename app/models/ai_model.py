@@ -132,35 +132,33 @@ class ImageAnalysisModel:
             image = Image.open(image_path).convert("RGB")
             
             try:
-                # LLaVA-1.5 모델에 대한 좌기적인 표준 접근법 사용
-                # 이미지 전처리
-                pixel_values = self.processor.image_processor(image, return_tensors="pt").pixel_values.to(self.device)
+                # 재시도: pipeline 접근 방식으로 구현
+                from transformers import pipeline
                 
-                # 프롬프트 토큰화
-                input_ids = self.processor.tokenizer(
-                    settings.PROMPT_TEMPLATE,
-                    return_tensors="pt",
-                    add_special_tokens=False
-                ).input_ids.to(self.device)
+                # 모델이 이미 로드되어 있으므로 직접 지정
+                llava_pipe = pipeline(
+                    "image-to-text", 
+                    model=self.model, 
+                    tokenizer=self.processor.tokenizer,
+                    image_processor=self.processor.image_processor,
+                    device=self.device
+                )
                 
-                # 생성
-                with torch.no_grad():
-                    output = self.model.generate(
-                        input_ids=input_ids,
-                        pixel_values=pixel_values,
-                        max_new_tokens=512, 
-                        do_sample=True,
-                        temperature=0.2,
-                        top_p=0.95,
-                        repetition_penalty=1.2
-                    )
+                # 이미지와 프롬프트로 직접 생성
+                result = llava_pipe(
+                    image,
+                    prompt=settings.PROMPT_TEMPLATE,
+                    generate_kwargs={
+                        "max_new_tokens": 512,
+                        "do_sample": True,
+                        "temperature": 0.2,
+                        "top_p": 0.95,
+                        "repetition_penalty": 1.2
+                    }
+                )
                 
-                # 응답 디코딩
-                # 입력 토큰 길이만큼 제외하고 나머지 취함
-                generated_text = self.processor.tokenizer.decode(
-                    output[0][input_ids.shape[1]:], 
-                    skip_special_tokens=True
-                ).strip()
+                # 결과가 리스트로 반환되며, 각 항목의 'generated_text' 키에 결과가 있음
+                generated_text = result[0]["generated_text"] if isinstance(result, list) else result["generated_text"]
                 
                 # 로그에 생성된 텍스트 기록
                 logger.info(f"Generated text: {generated_text}")
