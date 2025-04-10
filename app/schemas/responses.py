@@ -18,7 +18,7 @@ class AnalysisText(BaseModel):
     주제: str
     노출: str
     색감: str
-    "미적 감각": str
+    미적_감각: str
 
 
 class AnalysisChart(BaseModel):
@@ -28,7 +28,7 @@ class AnalysisChart(BaseModel):
     주제: int
     노출: int
     색감: int
-    "미적 감각": int
+    미적_감각: int
 
 
 class ImageAnalysisResponse(BaseModel):

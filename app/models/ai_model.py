@@ -211,7 +211,7 @@ class ImageAnalysisModel:
             "주제": "Could not evaluate the subject.",
             "노출": "Could not evaluate the exposure.",
             "색감": "Could not evaluate the color harmony.",
-            "미적 감각": "Could not evaluate the aesthetic quality."
+            "미적_감각": "Could not evaluate the aesthetic quality."
         }
         
         # 랜덤 점수로 각 카테고리 채우기
