@@ -114,6 +114,7 @@ class Settings(BaseSettings):
     - Provide precise scores (not rounded).
     - Hashtags should reflect the image's subject, style, or mood.
     - The output must be in json format.
+    - Hashtags should be returned as plain strings without the '#' symbol. For example: ["sunnyday", "naturewalk"]
 
     ---
 
