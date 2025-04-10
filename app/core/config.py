@@ -52,7 +52,7 @@ class Settings(BaseSettings):
         "subject",          # 주제
         "exposure",         # 노출
         "color_harmony",    # 색감
-        "aesthetic_quality" # 미적_감각
+        "aesthetic_quality" # 미적감각
     ]
     
     # 평가 카테고리 한글명
@@ -62,7 +62,7 @@ class Settings(BaseSettings):
         "subject": "주제",
         "exposure": "노출",
         "color_harmony": "색감",
-        "aesthetic_quality": "미적_감각",
+        "aesthetic_quality": "미적감각",
         "overall": "종합평가"
     }
     

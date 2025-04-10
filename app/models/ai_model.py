@@ -140,6 +140,8 @@ class ImageAnalysisModel:
                 # 이미지 전처리 및 입력 준비
                 inputs = self.processor(text=prompt, images=image, return_tensors="pt").to(self.device)
                 
+                if 'image_sizes' in inputs:
+                    del inputs['image_sizes']
                 # 생성
                 with torch.no_grad():
                     output = self.model.generate(
@@ -221,7 +223,7 @@ class ImageAnalysisModel:
             "주제": "Could not evaluate the subject.",
             "노출": "Could not evaluate the exposure.",
             "색감": "Could not evaluate the color harmony.",
-            "미적_감각": "Could not evaluate the aesthetic quality."
+            "미적감각": "Could not evaluate the aesthetic quality."
         }
         
         # 랜덤 점수로 각 카테고리 채우기
