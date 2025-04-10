@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     
     # 프롬프트 템플릿
     PROMPT_TEMPLATE: str = """
-    Please evaluate the given image using the following six criteria. For each criterion, provide an integer score from 1 to 100, based on the detailed sub-criteria below. Avoid using rounded scores like 70, 75, or 80 — use specific values like 72, 83, or 91.
+    Please evaluate the given image using the following six criteria. For each criterion, provide an integer score from 1 to 100, based on the detailed sub-criteria below. DO NOT USE ROUNDED SCORES ENDING IN 0 OR 5 (like 60, 65, 70, 75, 80). Instead, use precise values like 63, 72, 84, 97, etc.
 
     For each item, return a short feedback sentence along with the score, in the format:  
     "criterion_name": {"score": integer, "comment": "brief constructive suggestion"}
@@ -110,11 +110,11 @@ class Settings(BaseSettings):
 
     ---
 
-    **Important**
-    - Provide precise scores (not rounded).
-    - Hashtags should reflect the image's subject, style, or mood.
-    - IMPORTANT: The output **must be valid JSON**, parseable using Python's `json.loads()`. Do not leave trailing commas or missing braces.
-    - Hashtags should be returned as plain strings without the '#' symbol. For example: ["sunnyday", "naturewalk"]
+    **VERY IMPORTANT**
+    - ALL SCORES MUST NOT END IN 0 OR 5. Never use scores like 70, 75, 80, 85, 90! Always use specific values like 73, 82, 91, etc.
+    - The "hashtags" field MUST be an array of simple strings WITHOUT the '#' symbol. Example: ["nature", "portrait", "sunset"] NOT ["#nature", "#portrait", "#sunset"]
+    - The output must be valid JSON, parseable using Python's `json.loads()`. No trailing commas, proper nesting of braces.
+    - The "overall" score should be a weighted average of the other scores (not ending in 0 or 5).
 
     ---
 
@@ -132,7 +132,7 @@ class Settings(BaseSettings):
         "comment": "The focus is sharp and textures on the subject’s clothing are clearly visible."
     },
     "subject": {
-        "score": 85,
+        "score": 84,
         "comment": "The subject is clearly the woman, and the scene conveys a peaceful mood."
     },
     "exposure": {
@@ -140,7 +140,7 @@ class Settings(BaseSettings):
         "comment": "The image is slightly overexposed in some highlights; a lower ISO could help."
     },
     "color_harmony": {
-        "score": 90,
+        "score": 91,
         "comment": "The natural greens and skin tones work well together with no color distortion."
     },
     "aesthetic_quality": {
@@ -148,7 +148,7 @@ class Settings(BaseSettings):
         "comment": "The image has a warm, pleasant feel and a good balance of emotion and beauty."
     },
     "overall": {
-        "score": 85,
+        "score": 86,
         "comment": "A well-composed and vibrant image that effectively captures a calm outdoor moment."
     },
     "hashtags": ["sunnyday", "parkportrait", "naturewalk", "outdoorvibes"]

@@ -144,6 +144,17 @@ class ImageAnalysisModel:
         result = result.replace('color\\_harmony', 'color_harmony')
         result = result.replace('aesthetic\\_quality', 'aesthetic_quality')
         
+        # “["#tag1", "#tag2"]” 형태의 해시태그에서 # 제거
+        hashtags_with_hash_pattern = r'\[\s*"#([^"]+)"\s*(?:,\s*"#([^"]+)"\s*)*\]'
+        
+        def remove_hash_from_tags(match):
+            full_match = match.group(0)
+            # # 분자 제거
+            return full_match.replace('"#', '"')
+        
+        # 정규표현식 적용
+        result = re.sub(hashtags_with_hash_pattern, remove_hash_from_tags, result)
+        
         return result
     
     async def analyze_image(self, image_path: Union[str, Path]) -> Dict[str, Any]:
