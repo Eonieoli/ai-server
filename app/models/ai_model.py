@@ -132,17 +132,22 @@ class ImageAnalysisModel:
             image = Image.open(image_path).convert("RGB")
             
             try:
-                # LLaVA-1.5 모델에 맞는 형식으로 입력 준비
-                # Hugging Face 문서 및 GitHub 예제 참고
-                # 프롬프트 생성
-                prompt = settings.PROMPT_TEMPLATE
-
-                # 이미지와 프롬프트 처리
+                # LLaVA-1.5에 맞는 단순화된 방식 사용
+                # 이미지 처리
                 inputs = self.processor(
-                    prompt,
-                    image, 
+                    images=image,
                     return_tensors="pt"
                 ).to(self.device)
+                
+                # 프롬프트 토큰화
+                text_inputs = self.processor.tokenizer(
+                    settings.PROMPT_TEMPLATE,
+                    return_tensors="pt"
+                ).to(self.device)
+                
+                # 이미지와 텍스트 입력 결합
+                inputs["input_ids"] = torch.cat([inputs["input_ids"], text_inputs["input_ids"]], dim=1)
+                inputs["attention_mask"] = torch.cat([inputs["attention_mask"], text_inputs["attention_mask"]], dim=1)
                 
                 # 생성
                 with torch.no_grad():
