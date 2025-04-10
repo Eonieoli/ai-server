@@ -306,7 +306,8 @@ class ImageAnalysisModel:
             "comment": overall_comment,
             "analysisText": analysis_text,
             "analysisChart": analysis_chart,
-            "hashTag": hashtags
+            "hashTag": hashtags,
+            "version": 2
         }
     
     def _validate_and_format_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
@@ -407,7 +408,8 @@ class ImageAnalysisModel:
             "comment": overall_comment,
             "analysisText": analysis_text,
             "analysisChart": analysis_chart,
-            "hashTag": translated_hashtags
+            "hashTag": translated_hashtags,
+            "version": 2
         }
         
         return formatted_result

@@ -38,6 +38,7 @@ class ImageAnalysisResponse(BaseModel):
     analysisText: AnalysisText
     analysisChart: AnalysisChart
     hashTag: List[str]
+    version: int = 2
 
 
 class HealthResponse(BaseModel):
