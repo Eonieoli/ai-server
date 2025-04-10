@@ -68,18 +68,24 @@ class Settings(BaseSettings):
     
     # 프롬프트 템플릿
     PROMPT_TEMPLATE: str = """
-    Please evaluate this image according to the following criteria on a scale of 1 to 100 using precise individual integer scores (not rounded to 5 or 10):
-    
-    1. Composition: How well the elements in the photo are arranged
-    2. Sharpness: How clearly the main subject of the photo is captured
-    3. Subject: How clear and interesting the main subject of the photo is
-    4. Exposure: How appropriate the brightness of the photo is
-    5. Color Harmony: How well the colors work together
-    6. Aesthetic Quality: The overall aesthetic value, artistic merit, and emotional impact of the photo
-    
-    Also, please suggest up to 4 relevant hashtags that describe the content, style, or subject of this image.
-    
-    Provide a score and a brief explanation for each item. Return the results in JSON format:
+    Please critically evaluate this image using the following criteria. You must assign a precise integer score between 1 and 100 for each criterion. Do NOT round to the nearest 5 or 10. Avoid using numbers like 70, 75, 80, etc. Instead, choose specific values like 73, 87, or 91. Be objective and avoid writing in an overly poetic or emotional tone.
+
+    Evaluation Criteria:
+
+    1. Composition: How well the elements in the photo are arranged.
+    2. Sharpness: How clearly the main subject of the photo is captured.
+    3. Subject: How clear and interesting the main subject is.
+    4. Exposure: How well-balanced the brightness and contrast are.
+    5. Color Harmony: How well the colors work together.
+    6. Aesthetic Quality: The overall artistic value and visual appeal of the photo.
+
+    In your response:
+    - Return a JSON object with the following structure.
+    - Each score must be a precise integer between 1 and 100 (not rounded).
+    - Keep comments factual, concise, and avoid emotional or poetic language.
+    - Include up to 4 relevant hashtags that describe the image's content, style, or subject.
+
+    Format:
     {
         "composition": {"score": 0, "comment": ""},
         "sharpness": {"score": 0, "comment": ""},
@@ -90,8 +96,18 @@ class Settings(BaseSettings):
         "overall": {"score": 0, "comment": ""},
         "hashtags": ["", "", "", ""]
     }
-    
-    Important: You MUST give exact integer scores between 1 and 100 for each criterion. DO NOT round scores to the nearest 5 or 10. Avoid common round numbers like 70, 75, 80, etc. Use more specific numbers like 73, 88, 91. 
+
+    Example output:
+    {
+        "composition": {"score": 87, "comment": "The elements are well-arranged with balanced spacing and alignment."},
+        "sharpness": {"score": 91, "comment": "The subject is sharply focused with clear details."},
+        "subject": {"score": 88, "comment": "The main subject is prominent and visually interesting."},
+        "exposure": {"score": 84, "comment": "Lighting is well-balanced with good contrast and no overexposure."},
+        "color_harmony": {"score": 89, "comment": "Colors are complementary and enhance the overall look."},
+        "aesthetic_quality": {"score": 90, "comment": "The photo has strong visual appeal and professional quality."},
+        "overall": {"score": 89, "comment": "A well-executed image with strong technical and visual components."},
+        "hashtags": ["portrait", "cleancomposition", "sharpfocus", "professional"]
+    }
 
     """
     
