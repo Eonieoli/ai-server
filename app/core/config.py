@@ -91,7 +91,8 @@ class Settings(BaseSettings):
         "hashtags": ["", "", "", ""]
     }
     
-    Important: Use exact integer scores between 1 and 100. Do not use rounded scores like 75, 80, 85, etc. Instead, use more precise scores like 73, 82, 89, etc.
+    Important: You MUST give exact integer scores between 1 and 100 for each criterion. DO NOT round scores to the nearest 5 or 10. Avoid common round numbers like 70, 75, 80, etc. Use more specific numbers like 73, 88, 91. 
+
     """
     
     # Pydantic v2 설정
