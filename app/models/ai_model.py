@@ -132,39 +132,35 @@ class ImageAnalysisModel:
             image = Image.open(image_path).convert("RGB")
             
             try:
-                # LLaVA-1.5에 맞는 단순화된 방식 사용
-                # 이미지 처리
-                inputs = self.processor(
-                    images=image,
-                    return_tensors="pt"
-                ).to(self.device)
+                # LLaVA-1.5 모델에 대한 좌기적인 표준 접근법 사용
+                # 이미지 전처리
+                pixel_values = self.processor.image_processor(image, return_tensors="pt").pixel_values.to(self.device)
                 
                 # 프롬프트 토큰화
-                text_inputs = self.processor.tokenizer(
+                input_ids = self.processor.tokenizer(
                     settings.PROMPT_TEMPLATE,
-                    return_tensors="pt"
-                ).to(self.device)
-                
-                # 이미지와 텍스트 입력 결합
-                inputs["input_ids"] = torch.cat([inputs["input_ids"], text_inputs["input_ids"]], dim=1)
-                inputs["attention_mask"] = torch.cat([inputs["attention_mask"], text_inputs["attention_mask"]], dim=1)
+                    return_tensors="pt",
+                    add_special_tokens=False
+                ).input_ids.to(self.device)
                 
                 # 생성
                 with torch.no_grad():
                     output = self.model.generate(
-                        **inputs,
+                        input_ids=input_ids,
+                        pixel_values=pixel_values,
                         max_new_tokens=512, 
                         do_sample=True,
-                        temperature=0.2,       # 살짝 높은 온도로 변경 - 더 다양한 응답 생성
-                        top_p=0.95,          # top-p 샘플링 설정
-                        repetition_penalty=1.2  # 반복 패널티 설정
+                        temperature=0.2,
+                        top_p=0.95,
+                        repetition_penalty=1.2
                     )
                 
-                # 응답 디코딩 - LLaVA-1.5 접근법
-                # 입력 토큰 이후의 부분만 추출
-                input_length = inputs.input_ids.shape[1]
-                generated_ids = output[0][input_length:]
-                generated_text = self.processor.decode(generated_ids, skip_special_tokens=True).strip()
+                # 응답 디코딩
+                # 입력 토큰 길이만큼 제외하고 나머지 취함
+                generated_text = self.processor.tokenizer.decode(
+                    output[0][input_ids.shape[1]:], 
+                    skip_special_tokens=True
+                ).strip()
                 
                 # 로그에 생성된 텍스트 기록
                 logger.info(f"Generated text: {generated_text}")
