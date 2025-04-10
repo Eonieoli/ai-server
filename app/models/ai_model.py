@@ -6,6 +6,7 @@ import torch
 import logging
 import numpy as np
 import base64
+import re  # 정규표현식 처리를 위해 추가
 from io import BytesIO
 from pathlib import Path
 from typing import Dict, Any, Union, Optional
@@ -108,6 +109,43 @@ class ImageAnalysisModel:
             
             logger.info("Model unloaded from memory")
     
+    def _fix_json_hashtags(self, json_str: str) -> str:
+        """
+        JSON 문자열에서 해시태그 형식 문제 수정
+        
+        Args:
+            json_str (str): 원본 JSON 문자열
+            
+        Returns:
+            str: 수정된 JSON 문자열
+        """
+        # [#tag1 #tag2 #tag3] 형태를 ["tag1", "tag2", "tag3"] 형태로 변환
+        hashtag_pattern = r'\[\s*#([^\[\]]+)\s*\]'
+        
+        def replace_hashtags(match):
+            # 해시태그를 추출하여 적절한 형태로 변환
+            hashtags = match.group(1).strip()
+            tags = re.findall(r'#(\w+)', hashtags)
+            
+            # 정확한 JSON 형식의 배열로 변환
+            json_array = '["' + '", "'.join(tags) + '"]'
+            return json_array
+        
+        # 정규표현식 적용
+        result = re.sub(hashtag_pattern, replace_hashtags, json_str)
+        
+        # 이중 따옴표 수정
+        result = result.replace('\"', '"')
+        
+        # 엔티티 및 에스케이프 문자 처리
+        result = result.replace('\\"', '"').replace('&quot;', '"')
+        
+        # color_harmony -> color_harmony 등의 키 이름 처리
+        result = result.replace('color\\_harmony', 'color_harmony')
+        result = result.replace('aesthetic\\_quality', 'aesthetic_quality')
+        
+        return result
+    
     async def analyze_image(self, image_path: Union[str, Path]) -> Dict[str, Any]:
         """
         이미지 분석 함수
@@ -183,10 +221,18 @@ class ImageAnalysisModel:
                 
                 # JSON 부분 추출
                 try:
+                    # 해시태그 형식 문제 해결
+                    # ASSISTANT 부분 제거
+                    if "ASSISTANT:" in generated_text:
+                        generated_text = generated_text.split("ASSISTANT:", 1)[1].strip()
+                    
                     # 마크다운 코드 블록에서 JSON 추출
                     if "```json" in generated_text and "```" in generated_text.split("```json", 1)[1]:
                         # 마크다운 JSON 코드 블록 파싱
                         json_content = generated_text.split("```json", 1)[1].split("```", 1)[0].strip()
+                        
+                        # 해시태그 형식 수정
+                        json_content = self._fix_json_hashtags(json_content)
                         analysis_result = json.loads(json_content)
                     else:
                         # 일반적인 JSON 추출 시도
@@ -195,6 +241,9 @@ class ImageAnalysisModel:
                         
                         if json_start >= 0 and json_end > json_start:
                             json_str = generated_text[json_start:json_end]
+                            
+                            # 해시태그 형식 수정
+                            json_str = self._fix_json_hashtags(json_str)
                             analysis_result = json.loads(json_str)
                         else:
                             # JSON을 찾을 수 없는 경우 기본 응답 생성
@@ -202,6 +251,7 @@ class ImageAnalysisModel:
                             analysis_result = self._create_default_response()
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse JSON from model response: {e}")
+                    logger.error(f"Raw JSON content: {generated_text}")
                     analysis_result = self._create_default_response()
                 
                 # 결과 유효성 검사 및 포맷 맞추기
@@ -281,9 +331,13 @@ class ImageAnalysisModel:
             if category in result and isinstance(result[category], dict):
                 cat_result = result[category]
                 
-                # 점수 확인 및 조정 (유틸리티 함수 사용)
-                from app.utils.helper import scale_score
-                score = scale_score(cat_result.get("score", 50))
+                # 점수 확인 - 모델이 정확한 점수를 사용하므로 scale_score 사용 안함
+                score = cat_result.get("score", 50)
+                
+                # 점수가 1~100 범위에 있는지 확인
+                if not isinstance(score, (int, float)):
+                    score = 50  # 기본값
+                score = max(1, min(100, score))  # 1~100 범위로 제한
                 
                 # 코멘트 확인
                 comment = cat_result.get("comment", "")
@@ -308,9 +362,11 @@ class ImageAnalysisModel:
             overall_score = 50
             overall_comment = "이미지에 대한 전체적인 평가 정보를 제공하지 못했습니다."
         else:
-            # 전체 점수 확인 및 조정 (유틸리티 함수 사용)
-            from app.utils.helper import scale_score
-            overall_score = scale_score(overall.get("score", 50))
+            # 전체 점수 확인 및 제한
+            overall_score = overall.get("score", 50)
+            if not isinstance(overall_score, (int, float)):
+                overall_score = 50
+            overall_score = max(1, min(100, overall_score))  # 1~100 범위로 제한
             
             # 전체 코멘트 가져오기
             overall_comment = overall.get("comment", "")

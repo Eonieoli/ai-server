@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     
     # 프롬프트 템플릿
     PROMPT_TEMPLATE: str = """
-    Please evaluate this image according to the following criteria on a scale of 1 to 100:
+    Please evaluate this image according to the following criteria on a scale of 1 to 100 using precise individual integer scores (not rounded to 5 or 10):
     
     1. Composition: How well the elements in the photo are arranged
     2. Sharpness: How clearly the main subject of the photo is captured
@@ -91,7 +91,7 @@ class Settings(BaseSettings):
         "hashtags": ["", "", "", ""]
     }
     
-    Important: Scores should be between 1 and 100.
+    Important: Use exact integer scores between 1 and 100. Do not use rounded scores like 75, 80, 85, etc. Instead, use more precise scores like 73, 82, 89, etc.
     """
     
     # Pydantic v2 설정
