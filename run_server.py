@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
     print(f"\nStarting AI server on {host}:{port}")
     print(f"Using GPU: CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set')}")
-    print("Server will start with 4-bit quantized LLaVA-NeXT-Video-7B model")
+    print("Server will start with llava-v1.6-vicuna-7b model")
 
     # 서버 실행
     uvicorn.run("app.main:app", host=host, port=port, workers=1)
