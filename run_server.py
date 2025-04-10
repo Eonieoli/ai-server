@@ -59,6 +59,7 @@ if __name__ == "__main__":
     print("Server will start with llava-1.5-7b-hf model")
 
     # 서버 실행
-    # T4 GPU가 있지만 메모리 부족 문제로 워커 수를 2로 조정
-    # 병렬 처리를 위해 워커 수는 1보다 크게 설정
-    uvicorn.run("app.main:app", host=host, port=port, workers=2)
+    # GPU 메모리 부족 문제로 처음에는 하나의 워커로 시작
+    # 먼저 단일 워커로 잘 동작하는지 확인한 후
+    # 성공적으로 동작하면 추후에 workers=2로 변경하여 병렬 처리 활성화
+    uvicorn.run("app.main:app", host=host, port=port, workers=1)

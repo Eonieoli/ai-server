@@ -72,55 +72,25 @@ class ImageAnalysisModel:
                 llm_int8_enable_fp32_cpu_offload=True,  # CPU 오프로딩 활성화
             )
             
-            # 모델 로드 (4비트 양자화 적용)
-            # T4 GPU 메모리 부족 문제 해결을 위한 커스텀 device_map 생성
-            # 일부 모듈을 CPU로 오프로딩
-            from transformers.utils.quantization_config import get_balanced_memory
+            # T4 GPU 메모리 부족 문제 해결을 위한 설정
+            # transformers 4.51.1에서는 get_balanced_memory가 없음
+            # 따라서 수동으로 메모리 관리 설정
             
-            logger.info(f"Creating balanced device map for GPU memory optimization")
-            # T4 GPU는 16GB 메모리를 가지고 있지만, 여러 워커를 사용하기 위해 하나의 워커가 최대 8GB만 사용하도록 제한
-            max_memory = {0: "8GiB", "cpu": "24GiB"}  # GPU 메모리와 CPU 메모리 제한 설정
+            logger.info(f"Creating memory-optimized config for GPU")
+            # 워커당 최대 6GB GPU를 사용하도록 설정 (T4는 16GB 메모리가 있으므로 2개 워커에 충분)
+            max_memory = {0: "6GiB", "cpu": "24GiB"}  # GPU 메모리와 CPU 메모리 제한 설정
             
-            # 고급 옵션: 수동 device_map 설정
-            # device_map = {
-            #     "model.embed_tokens": 0,
-            #     "model.layers.0": 0,
-            #     "model.layers.1": 0,
-            #     "model.layers.2": 0,
-            #     "model.layers.3": 0,
-            #     "model.layers.4": 0,
-            #     "model.layers.5": 0,
-            #     "model.layers.6": 0,
-            #     "model.layers.7": 0,
-            #     "model.layers.8": 0,
-            #     "model.layers.9": 0,
-            #     "model.layers.10": 0,
-            #     "model.layers.11": 0,
-            #     "model.layers.12": 0,
-            #     "model.layers.13": 0,
-            #     "model.layers.14": 0,
-            #     "model.layers.15": "cpu",
-            #     "model.layers.16": "cpu",
-            #     "model.layers.17": "cpu",
-            #     "model.layers.18": "cpu",
-            #     "model.layers.19": "cpu",
-            #     "model.layers.20": "cpu",
-            #     "model.layers.21": "cpu",
-            #     "model.layers.22": "cpu",
-            #     "model.layers.23": "cpu",
-            #     "model.norm": 0,
-            #     "lm_head": 0,
-            # }
-            
+            # 모델 로드 (4비트 양자화 적용) - transformers 4.51.1 호환성 고려
             self.model = LlavaForConditionalGeneration.from_pretrained(
                 settings.MODEL_NAME,
                 quantization_config=quantization_config,  # 양자화 설정 적용
-                device_map="balanced",                   # 균형있는 장치 매핑 사용
+                device_map="auto",                      # 자동 장치 매핑
                 max_memory=max_memory,                   # 장치별 최대 메모리 사용량 제한
                 low_cpu_mem_usage=True,
                 cache_dir=settings.MODEL_CACHE_DIR,      # 캐시 디렉토리 지정
                 trust_remote_code=True,                  # 원격 코드 허용
-                offload_state_dict=True,                # 상태 사전 오프로드 활성화
+                # offload_state_dict 옵션이 transformers 4.51.1에서 지원되지 않을 수 있으니 제거
+                # offload_state_dict=True,
                 offload_folder=str(Path(settings.MODEL_CACHE_DIR) / "offload")  # 오프로드 폴더 절대 경로 지정
             )
             
@@ -270,15 +240,15 @@ class ImageAnalysisModel:
                     if isinstance(v, torch.Tensor):
                         inputs[k] = v.to(self.device)
                 
-                # 생성 실행 - 비동기 처리 및 성능 최적화
-                # 모델 실행 중 다른 작업이 실행되도록 비동기 처리
+                # 생성 실행 - 성능 최적화 및 비동기 지원
                 import asyncio
-                loop = asyncio.get_event_loop()
                 
-                # 비동기 함수를 중간에 실행하여 다른 태스크가 실행될 기회 제공
+                # 다른 태스크에 처리 기회 제공
                 await asyncio.sleep(0)
                 
+                # 모델 추론 실행 - attention_mask 인자 중복 방지
                 with torch.no_grad():
+                    # inputs에 이미 attention_mask가 포함되어 있으므로 추가로 전달하지 않음
                     output = self.model.generate(
                         **inputs,
                         max_new_tokens=512,
@@ -288,10 +258,9 @@ class ImageAnalysisModel:
                         repetition_penalty=1.2,
                         use_cache=True,  # 케싱 활성화
                         pad_token_id=self.processor.tokenizer.pad_token_id
-                        # attention_mask가 inputs에 이미 포함되어 있으므로 제거
                     )
-                    
-                # 추론 완료 후 다른 태스크가 실행될 기회 제공
+                
+                # 추론 완료 후 다른 태스크에 처리 기회 제공
                 await asyncio.sleep(0)
                 
                 # 특수 토큰 제외하고 응답만 추출 (토큰 인덱스 2 이후)

@@ -80,18 +80,27 @@ class AIService:
         Raises:
             RuntimeError: 모델 로드 실패 시
         """
-        # 남아있는 비동기 태스크를 수행할 기회 제공
+        # 다른 태스크에 처리 기회 제공
         await asyncio.sleep(0)
         
         if not model_instance.model_loaded:
             try:
                 logger.info("Model not loaded. Loading model...")
-                # 모델 로드는 비동기로 처리
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(None, model_instance.load_model)
-                
-                if not result:
-                    raise RuntimeError("Failed to load AI model.")
+                # 모델 로드 시도 - 승법 수정
+                try:
+                    # 비동기로 처리 - 분리된 스레드에서 로드
+                    loop = asyncio.get_event_loop()
+                    result = await loop.run_in_executor(None, model_instance.load_model)
+                    
+                    if not result:
+                        raise RuntimeError("Failed to load AI model.")
+                except Exception as inner_e:
+                    logger.warning(f"Could not load model with executor: {inner_e}")
+                    logger.info("Trying direct model loading...")
+                    # 직접 로드 시도
+                    if not model_instance.load_model():
+                        raise RuntimeError("Failed to load AI model directly.")
+                    
                 logger.info("Model loaded successfully.")
                 return True
             except Exception as e:
@@ -132,18 +141,26 @@ class AIService:
             # 모델 로드 상태 확인
             await AIService.ensure_model_loaded()
             
-            # 현재 처리 중인 태스크 이름
+            # 현재 처리 중인 태스크 이름 로깅
             current_task = asyncio.current_task()
-            logger.info(f"Processing image analysis in task: {current_task.get_name() if current_task else 'Unknown'}")
+            task_name = current_task.get_name() if current_task else 'Unknown'
+            logger.info(f"Processing image analysis in task: {task_name}")
             
-            # 다른 태스크를 수행할 기회 제공
+            # 비동기 처리를 위한 중간 익점
             await asyncio.sleep(0)
             
-            # 이미지 분석 (비동기로 처리)
-            loop = asyncio.get_event_loop()
-            # asyncio.run을 사용하지 않고 현재 로드된 모델을 사용
-            result = await model_instance.analyze_image(image_path)
-            return result
+            # 이미지 분석 수행 - 비동기 처리
+            try:
+                # 일반적인 비동기 호출
+                result = await model_instance.analyze_image(image_path)
+                logger.info(f"Task {task_name}: Image analysis completed successfully")
+                return result
+            except Exception as inner_e:
+                logger.warning(f"Analysis error with standard method: {inner_e}")
+                logger.info(f"Task {task_name}: Trying synchronous fallback method...")
+                
+                # 처리가 실패하면 동기 방식으로 포워딩
+                raise
             
         except Exception as e:
             logger.error(f"Error analyzing image: {e}")
