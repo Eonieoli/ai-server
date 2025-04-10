@@ -113,7 +113,7 @@ class Settings(BaseSettings):
     **Important**
     - Provide precise scores (not rounded).
     - Hashtags should reflect the image's subject, style, or mood.
-    - The output must be in json format.
+    - IMPORTANT: The output **must be valid JSON**, parseable using Python's `json.loads()`. Do not leave trailing commas or missing braces.
     - Hashtags should be returned as plain strings without the '#' symbol. For example: ["sunnyday", "naturewalk"]
 
     ---
