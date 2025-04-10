@@ -62,23 +62,66 @@ class ImageAnalysisModel:
             # 모델 캐시 디렉토리 생성
             Path(settings.MODEL_CACHE_DIR).mkdir(parents=True, exist_ok=True)
             
-            # 4비트 양자화 설정 - 메모리 최적화
+            # 4비트 양자화 설정 - 메모리 최적화 및 CPU 오프로딩 활성화
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,           # 4비트 양자화 적용
                 bnb_4bit_compute_dtype=torch.float16,  # 계산 시 float16 사용
                 bnb_4bit_use_double_quant=True,  # 더블 양자화 적용 (메모리 사용량 절약)
                 bnb_4bit_quant_type="nf4",  # NF4 양자화 타입 사용
-                offload_folder="offload",  # 오프로드 폴더 지정
+                offload_folder=str(Path(settings.MODEL_CACHE_DIR) / "offload"),  # 오프로드 폴더 절대 경로 지정
+                llm_int8_enable_fp32_cpu_offload=True,  # CPU 오프로딩 활성화
             )
             
             # 모델 로드 (4비트 양자화 적용)
+            # T4 GPU 메모리 부족 문제 해결을 위한 커스텀 device_map 생성
+            # 일부 모듈을 CPU로 오프로딩
+            from transformers.utils.quantization_config import get_balanced_memory
+            
+            logger.info(f"Creating balanced device map for GPU memory optimization")
+            # T4 GPU는 16GB 메모리를 가지고 있지만, 여러 워커를 사용하기 위해 하나의 워커가 최대 8GB만 사용하도록 제한
+            max_memory = {0: "8GiB", "cpu": "24GiB"}  # GPU 메모리와 CPU 메모리 제한 설정
+            
+            # 고급 옵션: 수동 device_map 설정
+            # device_map = {
+            #     "model.embed_tokens": 0,
+            #     "model.layers.0": 0,
+            #     "model.layers.1": 0,
+            #     "model.layers.2": 0,
+            #     "model.layers.3": 0,
+            #     "model.layers.4": 0,
+            #     "model.layers.5": 0,
+            #     "model.layers.6": 0,
+            #     "model.layers.7": 0,
+            #     "model.layers.8": 0,
+            #     "model.layers.9": 0,
+            #     "model.layers.10": 0,
+            #     "model.layers.11": 0,
+            #     "model.layers.12": 0,
+            #     "model.layers.13": 0,
+            #     "model.layers.14": 0,
+            #     "model.layers.15": "cpu",
+            #     "model.layers.16": "cpu",
+            #     "model.layers.17": "cpu",
+            #     "model.layers.18": "cpu",
+            #     "model.layers.19": "cpu",
+            #     "model.layers.20": "cpu",
+            #     "model.layers.21": "cpu",
+            #     "model.layers.22": "cpu",
+            #     "model.layers.23": "cpu",
+            #     "model.norm": 0,
+            #     "lm_head": 0,
+            # }
+            
             self.model = LlavaForConditionalGeneration.from_pretrained(
                 settings.MODEL_NAME,
                 quantization_config=quantization_config,  # 양자화 설정 적용
-                device_map="auto",                      # 자동 장치 매핑
+                device_map="balanced",                   # 균형있는 장치 매핑 사용
+                max_memory=max_memory,                   # 장치별 최대 메모리 사용량 제한
                 low_cpu_mem_usage=True,
                 cache_dir=settings.MODEL_CACHE_DIR,      # 캐시 디렉토리 지정
-                trust_remote_code=True                  # 원격 코드 허용
+                trust_remote_code=True,                  # 원격 코드 허용
+                offload_state_dict=True,                # 상태 사전 오프로드 활성화
+                offload_folder=str(Path(settings.MODEL_CACHE_DIR) / "offload")  # 오프로드 폴더 절대 경로 지정
             )
             
             logger.info("Model loaded using LlavaForConditionalGeneration with 4-bit quantization")
@@ -244,8 +287,8 @@ class ImageAnalysisModel:
                         top_p=0.95,
                         repetition_penalty=1.2,
                         use_cache=True,  # 케싱 활성화
-                        pad_token_id=self.processor.tokenizer.pad_token_id,
-                        attention_mask=inputs.get("attention_mask"),
+                        pad_token_id=self.processor.tokenizer.pad_token_id
+                        # attention_mask가 inputs에 이미 포함되어 있으므로 제거
                     )
                     
                 # 추론 완료 후 다른 태스크가 실행될 기회 제공
