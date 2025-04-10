@@ -61,16 +61,14 @@ class ImageAnalysisModel:
                 bnb_4bit_quant_type="nf4",  # NF4 양자화 타입 사용
             )
             
-            # 모델 로드 (4뺄트 양자화 적용)
-            # Hugging Face 문서에 따라 안정적인 커밋 아이디 사용
+            # 모델 로드 (4비트 양자화 적용)
             self.model = LlavaForConditionalGeneration.from_pretrained(
                 settings.MODEL_NAME,
                 quantization_config=quantization_config,  # 양자화 설정 적용
                 device_map="auto",                      # 자동 장치 매핑
                 low_cpu_mem_usage=True,
                 cache_dir=settings.MODEL_CACHE_DIR,      # 캐시 디렉토리 지정
-                trust_remote_code=True,                 # 원격 코드 허용
-                revision="02e0e67",                     # 안정적인 커밋 ID 지정
+                trust_remote_code=True                  # 원격 코드 허용
             )
             
             logger.info("Model loaded using LlavaForConditionalGeneration with 4-bit quantization")
@@ -79,8 +77,7 @@ class ImageAnalysisModel:
             self.processor = LlavaProcessor.from_pretrained(
                 settings.MODEL_NAME,
                 cache_dir=settings.MODEL_CACHE_DIR,
-                trust_remote_code=True,                   # 원격 코드 허용
-                revision="02e0e67",                       # 모델과 동일한 커밋 ID 사용
+                trust_remote_code=True                   # 원격 코드 허용
             )
             logger.info("Processor loaded using LlavaProcessor")
             
@@ -146,6 +143,7 @@ class ImageAnalysisModel:
                     image, 
                     return_tensors="pt"
                 ).to(self.device)
+                
                 # 생성
                 with torch.no_grad():
                     output = self.model.generate(
