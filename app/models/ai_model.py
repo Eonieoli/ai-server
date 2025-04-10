@@ -5,6 +5,8 @@ import json
 import torch
 import logging
 import numpy as np
+import base64
+from io import BytesIO
 from pathlib import Path
 from typing import Dict, Any, Union, Optional
 from PIL import Image
@@ -132,33 +134,31 @@ class ImageAnalysisModel:
             image = Image.open(image_path).convert("RGB")
             
             try:
-                # 재시도: pipeline 접근 방식으로 구현
-                from transformers import pipeline
+                # 마지막 방법: 원시 방식으로 시도
+                # 프롬프트 준비
+                prompt = settings.PROMPT_TEMPLATE
                 
-                # 모델이 이미 로드되어 있으므로 직접 지정
-                # device 인자 제거 - accelerate와 호환성 문제 해결
-                llava_pipe = pipeline(
-                    "image-to-text", 
-                    model=self.model, 
-                    tokenizer=self.processor.tokenizer,
-                    image_processor=self.processor.image_processor
-                )
+                # 이미지 전처리
+                inputs = self.processor(images=image, text=prompt, return_tensors="pt")
                 
-                # 이미지와 프롬프트로 직접 생성
-                result = llava_pipe(
-                    image,
-                    prompt=settings.PROMPT_TEMPLATE,
-                    generate_kwargs={
-                        "max_new_tokens": 512,
-                        "do_sample": True,
-                        "temperature": 0.2,
-                        "top_p": 0.95,
-                        "repetition_penalty": 1.2
-                    }
-                )
+                for key in inputs:
+                    if torch.is_tensor(inputs[key]):
+                        inputs[key] = inputs[key].to(self.device)
                 
-                # 결과가 리스트로 반환되며, 각 항목의 'generated_text' 키에 결과가 있음
-                generated_text = result[0]["generated_text"] if isinstance(result, list) else result["generated_text"]
+                # 이미지 토큰 생성
+                with torch.no_grad():
+                    outputs = self.model.generate(
+                        **inputs,
+                        max_new_tokens=512,
+                        do_sample=True,
+                        temperature=0.2,
+                        top_p=0.95,
+                        repetition_penalty=1.2
+                    )
+                
+                # 디코딩
+                output_text = self.processor.decode(outputs[0], skip_special_tokens=True)
+                generated_text = output_text.strip()
                 
                 # 로그에 생성된 텍스트 기록
                 logger.info(f"Generated text: {generated_text}")
