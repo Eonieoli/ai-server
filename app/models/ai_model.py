@@ -61,7 +61,8 @@ class ImageAnalysisModel:
                 bnb_4bit_quant_type="nf4",  # NF4 양자화 타입 사용
             )
             
-            # 모델 로드 (4비트 양자화 적용)
+            # 모델 로드 (4뺄트 양자화 적용)
+            # Hugging Face 문서에 따라 안정적인 커밋 아이디 사용
             self.model = LlavaForConditionalGeneration.from_pretrained(
                 settings.MODEL_NAME,
                 quantization_config=quantization_config,  # 양자화 설정 적용
@@ -69,6 +70,7 @@ class ImageAnalysisModel:
                 low_cpu_mem_usage=True,
                 cache_dir=settings.MODEL_CACHE_DIR,      # 캐시 디렉토리 지정
                 trust_remote_code=True,                 # 원격 코드 허용
+                revision="02e0e67",                     # 안정적인 커밋 ID 지정
             )
             
             logger.info("Model loaded using LlavaForConditionalGeneration with 4-bit quantization")
@@ -78,7 +80,7 @@ class ImageAnalysisModel:
                 settings.MODEL_NAME,
                 cache_dir=settings.MODEL_CACHE_DIR,
                 trust_remote_code=True,                   # 원격 코드 허용
-                use_fast=True                            # 고속 프로세서 사용
+                revision="02e0e67",                       # 모델과 동일한 커밋 ID 사용
             )
             logger.info("Processor loaded using LlavaProcessor")
             
@@ -133,15 +135,17 @@ class ImageAnalysisModel:
             image = Image.open(image_path).convert("RGB")
             
             try:
-                # LLaVA v1.6 모델에 맞는 형식으로 입력 준비
-                # 프롬프트 설정 - LLaVA v1.6 공식 문서에 따른 방식
-                prompt = f"<image>\n{settings.PROMPT_TEMPLATE}"
-                
-                # 이미지 전처리 및 입력 준비
-                inputs = self.processor(text=prompt, images=image, return_tensors="pt").to(self.device)
-                
-                if 'image_sizes' in inputs:
-                    del inputs['image_sizes']
+                # LLaVA-1.5 모델에 맞는 형식으로 입력 준비
+                # Hugging Face 문서 및 GitHub 예제 참고
+                # 프롬프트 생성
+                prompt = settings.PROMPT_TEMPLATE
+
+                # 이미지와 프롬프트 처리
+                inputs = self.processor(
+                    prompt,
+                    image, 
+                    return_tensors="pt"
+                ).to(self.device)
                 # 생성
                 with torch.no_grad():
                     output = self.model.generate(
@@ -153,20 +157,11 @@ class ImageAnalysisModel:
                         repetition_penalty=1.2  # 반복 패널티 설정
                     )
                 
-                # 응답 디코딩
-                generated_text = self.processor.decode(output[0], skip_special_tokens=True)
-                
-                # 프롬프트 부분 제거 (프롬프트가 결과에 포함될 수 있음)
-                if generated_text.startswith("<image>"):
-                    # <image> 태그와 프롬프트 제거
-                    parts = generated_text.split("\n", 1)
-                    if len(parts) > 1:
-                        generated_text = parts[1].lstrip()
-                    
-                    # 프롬프트 나머지 부분 제거 시도
-                    prompt_template = settings.PROMPT_TEMPLATE.strip()
-                    if generated_text.startswith(prompt_template):
-                        generated_text = generated_text[len(prompt_template):].strip()
+                # 응답 디코딩 - LLaVA-1.5 접근법
+                # 입력 토큰 이후의 부분만 추출
+                input_length = inputs.input_ids.shape[1]
+                generated_ids = output[0][input_length:]
+                generated_text = self.processor.decode(generated_ids, skip_special_tokens=True).strip()
                 
                 # 로그에 생성된 텍스트 기록
                 logger.info(f"Generated text: {generated_text}")

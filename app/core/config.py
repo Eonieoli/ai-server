@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     GOOGLE_TRANSLATE_KEY: Optional[str] = None
     
     # AI 모델 관련 설정
-    MODEL_NAME: str = "llava-hf/llava-v1.6-vicuna-7b-hf"
+    MODEL_NAME: str = "llava-hf/llava-1.5-7b-hf"
     
     @property
     def MODEL_CACHE_DIR(self) -> Path:
