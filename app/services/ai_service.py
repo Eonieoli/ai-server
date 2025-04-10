@@ -80,10 +80,17 @@ class AIService:
         Raises:
             RuntimeError: 모델 로드 실패 시
         """
+        # 남아있는 비동기 태스크를 수행할 기회 제공
+        await asyncio.sleep(0)
+        
         if not model_instance.model_loaded:
             try:
                 logger.info("Model not loaded. Loading model...")
-                if not model_instance.load_model():
+                # 모델 로드는 비동기로 처리
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(None, model_instance.load_model)
+                
+                if not result:
                     raise RuntimeError("Failed to load AI model.")
                 logger.info("Model loaded successfully.")
                 return True
@@ -125,7 +132,16 @@ class AIService:
             # 모델 로드 상태 확인
             await AIService.ensure_model_loaded()
             
-            # 이미지 분석
+            # 현재 처리 중인 태스크 이름
+            current_task = asyncio.current_task()
+            logger.info(f"Processing image analysis in task: {current_task.get_name() if current_task else 'Unknown'}")
+            
+            # 다른 태스크를 수행할 기회 제공
+            await asyncio.sleep(0)
+            
+            # 이미지 분석 (비동기로 처리)
+            loop = asyncio.get_event_loop()
+            # asyncio.run을 사용하지 않고 현재 로드된 모델을 사용
             result = await model_instance.analyze_image(image_path)
             return result
             

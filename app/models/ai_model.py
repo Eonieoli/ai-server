@@ -36,6 +36,12 @@ class ImageAnalysisModel:
             torch.device: 사용할 장치
         """
         if settings.USE_GPU and torch.cuda.is_available():
+            # GPU 메모리 초기화
+            torch.cuda.empty_cache()
+            # 현재 사용 중인 메모리 확인
+            allocated = torch.cuda.memory_allocated(settings.GPU_DEVICE) / (1024 ** 3)
+            max_memory = torch.cuda.get_device_properties(settings.GPU_DEVICE).total_memory / (1024 ** 3)
+            logging.info(f"GPU Memory: {allocated:.2f}GB / {max_memory:.2f}GB")
             return torch.device(f"cuda:{settings.GPU_DEVICE}")
         return torch.device("cpu")
     
@@ -56,12 +62,13 @@ class ImageAnalysisModel:
             # 모델 캐시 디렉토리 생성
             Path(settings.MODEL_CACHE_DIR).mkdir(parents=True, exist_ok=True)
             
-            # 4비트 양자화 설정
+            # 4비트 양자화 설정 - 메모리 최적화
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,           # 4비트 양자화 적용
                 bnb_4bit_compute_dtype=torch.float16,  # 계산 시 float16 사용
                 bnb_4bit_use_double_quant=True,  # 더블 양자화 적용 (메모리 사용량 절약)
                 bnb_4bit_quant_type="nf4",  # NF4 양자화 타입 사용
+                offload_folder="offload",  # 오프로드 폴더 지정
             )
             
             # 모델 로드 (4비트 양자화 적용)
@@ -159,6 +166,13 @@ class ImageAnalysisModel:
     
     async def analyze_image(self, image_path: Union[str, Path]) -> Dict[str, Any]:
         """
+        비동기 이미지 분석 함수 - 병렬 처리 지원
+        """
+        # 이미지 분석 시작 로깅
+        import asyncio
+        task_name = asyncio.current_task().get_name() if asyncio.current_task() else "Unknown"
+        logger.info(f"Starting image analysis in task: {task_name}")
+        """
         이미지 분석 함수
         
         Args:
@@ -213,7 +227,14 @@ class ImageAnalysisModel:
                     if isinstance(v, torch.Tensor):
                         inputs[k] = v.to(self.device)
                 
-                # 생성 실행
+                # 생성 실행 - 비동기 처리 및 성능 최적화
+                # 모델 실행 중 다른 작업이 실행되도록 비동기 처리
+                import asyncio
+                loop = asyncio.get_event_loop()
+                
+                # 비동기 함수를 중간에 실행하여 다른 태스크가 실행될 기회 제공
+                await asyncio.sleep(0)
+                
                 with torch.no_grad():
                     output = self.model.generate(
                         **inputs,
@@ -221,8 +242,14 @@ class ImageAnalysisModel:
                         do_sample=True,
                         temperature=0.2,
                         top_p=0.95,
-                        repetition_penalty=1.2
+                        repetition_penalty=1.2,
+                        use_cache=True,  # 케싱 활성화
+                        pad_token_id=self.processor.tokenizer.pad_token_id,
+                        attention_mask=inputs.get("attention_mask"),
                     )
+                    
+                # 추론 완료 후 다른 태스크가 실행될 기회 제공
+                await asyncio.sleep(0)
                 
                 # 특수 토큰 제외하고 응답만 추출 (토큰 인덱스 2 이후)
                 generated_text = self.processor.decode(output[0][2:], skip_special_tokens=True)

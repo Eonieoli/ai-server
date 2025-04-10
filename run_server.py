@@ -59,4 +59,5 @@ if __name__ == "__main__":
     print("Server will start with llava-1.5-7b-hf model")
 
     # 서버 실행
-    uvicorn.run("app.main:app", host=host, port=port, workers=1)
+    # T4 GPU가 있으므로 워커 수를 늘려 병렬 처리
+    uvicorn.run("app.main:app", host=host, port=port, workers=3)
