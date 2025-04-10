@@ -136,12 +136,12 @@ class ImageAnalysisModel:
                 from transformers import pipeline
                 
                 # 모델이 이미 로드되어 있으므로 직접 지정
+                # device 인자 제거 - accelerate와 호환성 문제 해결
                 llava_pipe = pipeline(
                     "image-to-text", 
                     model=self.model, 
                     tokenizer=self.processor.tokenizer,
-                    image_processor=self.processor.image_processor,
-                    device=self.device
+                    image_processor=self.processor.image_processor
                 )
                 
                 # 이미지와 프롬프트로 직접 생성
