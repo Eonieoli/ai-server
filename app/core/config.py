@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     GOOGLE_TRANSLATE_KEY: Optional[str] = None
     
     # AI 모델 관련 설정
-    MODEL_NAME: str = "liuhaotian/llava-v1.6-vicuna-7b"
+    MODEL_NAME: str = "llava-hf/llava-v1.6-vicuna-7b-hf"
     
     @property
     def MODEL_CACHE_DIR(self) -> Path:
@@ -52,7 +52,7 @@ class Settings(BaseSettings):
         "subject",          # 주제
         "exposure",         # 노출
         "color_harmony",    # 색감
-        "aesthetic_quality" # 미적 감각
+        "aesthetic_quality" # 미적_감각
     ]
     
     # 평가 카테고리 한글명
@@ -62,7 +62,7 @@ class Settings(BaseSettings):
         "subject": "주제",
         "exposure": "노출",
         "color_harmony": "색감",
-        "aesthetic_quality": "미적 감각",
+        "aesthetic_quality": "미적_감각",
         "overall": "종합평가"
     }
     
