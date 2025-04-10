@@ -153,6 +153,7 @@ class Settings(BaseSettings):
     },
     "hashtags": ["sunnyday", "parkportrait", "naturewalk", "outdoorvibes"]
     }
+    ```
     """
     
     # Pydantic v2 설정
