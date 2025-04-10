@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, Any, Union, Optional
 from PIL import Image
 
-from transformers import LlavaProcessor, LlavaForConditionalGeneration, BitsAndBytesConfig
+from transformers import AutoProcessor, AutoModelForCausalLM, BitsAndBytesConfig
 
 from app.core.config import settings
 
@@ -64,7 +64,7 @@ class ImageAnalysisModel:
             )
             
             # 모델 로드 (4비트 양자화 적용)
-            self.model = LlavaForConditionalGeneration.from_pretrained(
+            self.model = AutoModelForCausalLM.from_pretrained(
                 settings.MODEL_NAME,
                 quantization_config=quantization_config,  # 양자화 설정 적용
                 device_map="auto",                      # 자동 장치 매핑
@@ -73,15 +73,15 @@ class ImageAnalysisModel:
                 trust_remote_code=True                  # 원격 코드 허용
             )
             
-            logger.info("Model loaded using LlavaForConditionalGeneration with 4-bit quantization")
+            logger.info("Model loaded using AutoModelForCausalLM with 4-bit quantization")
             
-            # 프로세서 로드 (고속 프로세서 사용)
-            self.processor = LlavaProcessor.from_pretrained(
+            # 프로세서 로드
+            self.processor = AutoProcessor.from_pretrained(
                 settings.MODEL_NAME,
                 cache_dir=settings.MODEL_CACHE_DIR,
                 trust_remote_code=True                   # 원격 코드 허용
             )
-            logger.info("Processor loaded using LlavaProcessor")
+            logger.info("Processor loaded using AutoProcessor")
             
             self.model_loaded = True
             logger.info(f"Model loaded successfully on {self.device} with 4-bit quantization")
@@ -134,20 +134,23 @@ class ImageAnalysisModel:
             image = Image.open(image_path).convert("RGB")
             
             try:
-                # 마지막 방법: 원시 방식으로 시도
-                # 프롬프트 준비
-                prompt = settings.PROMPT_TEMPLATE
+                # 공식 문서와 이슈 사례에서 확인한 바에 따라 올바른 방식으로 구현
+                # <image> 토큰이 포함된 프롬프트 형식
+                prompt_text = f"<image>\n{settings.PROMPT_TEMPLATE}"
                 
-                # 이미지 전처리
-                inputs = self.processor(images=image, text=prompt, return_tensors="pt")
+                # 이미지와 텍스트 함께 처리
+                inputs = self.processor(
+                    text=prompt_text,
+                    images=image,
+                    return_tensors="pt"
+                )
                 
-                for key in inputs:
-                    if torch.is_tensor(inputs[key]):
-                        inputs[key] = inputs[key].to(self.device)
+                # 모든 텐서를 적절한 장치로 이동
+                inputs = {k: v.to(self.device) for k, v in inputs.items() if torch.is_tensor(v)}
                 
-                # 이미지 토큰 생성
+                # 모델 생성
                 with torch.no_grad():
-                    outputs = self.model.generate(
+                    output_ids = self.model.generate(
                         **inputs,
                         max_new_tokens=512,
                         do_sample=True,
@@ -156,11 +159,14 @@ class ImageAnalysisModel:
                         repetition_penalty=1.2
                     )
                 
-                # 디코딩
-                output_text = self.processor.decode(outputs[0], skip_special_tokens=True)
-                generated_text = output_text.strip()
+                # 입력 토큰 너머의 출력만 디코딩
+                output_text = self.processor.batch_decode(
+                    output_ids[:, inputs["input_ids"].shape[1]:],
+                    skip_special_tokens=True
+                )[0]
                 
-                # 로그에 생성된 텍스트 기록
+                # 텍스트 클리닝
+                generated_text = output_text.strip()
                 logger.info(f"Generated text: {generated_text}")
                 
                 # JSON 부분 추출
